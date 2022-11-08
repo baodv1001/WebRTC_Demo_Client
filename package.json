@@ -1,0 +1,13 @@
+{
+  "scripts": {
+    "start": "start index.html"
+  },
+  "dependencies": {
+    "browserify": "^17.0.0",
+    "cors": "^2.8.5",
+    "express": "^4.18.2",
+    "socket.io": "^4.5.3",
+    "socket.io-client": "^4.5.3",
+    "webrtc-adapter": "^8.2.0"
+  }
+}
