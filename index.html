@@ -15,9 +15,75 @@
         <tr>
           <td>
             <video id="localVideo" autoplay></video>
+            <canvas hidden id="localCanvas" width="480" height="320"></canvas>
+            <video
+              hidden
+              id="video-stream"
+              autoplay
+              playsinline
+            ></video>
           </td>
           <td>
             <video id="remoteVideo" autoplay></video>
+            <canvas hidden id="remoteCanvas" width="480" height="320"></canvas>
+          </td>
+        </tr>
+        <tr>
+          <td>
+            <div class="background card">
+              <div>
+                <h3>Background</h3>
+                <button id="noBackground" title="none">None</button>
+                <button id="blurBackground" title="blur">Blur</button>
+                <button id="virutalBackground" title="image">
+                  <img style="width: 30px; height:30px" crossorigin="anonymous" src="https://i.postimg.cc/yNYTPDTZ/background.jpg" />
+                </button>
+              </div>
+            </div>
+          </td>
+          <td>
+            <div class="controls card">
+          <div>
+            <h3>Controls</h3>
+            <div class="customization">
+              <label>Library</label>
+              <select id="librarySelect">
+                <option value="bodypix">Bodypix</option>
+              </select>
+            </div>
+            <div class="customization">
+              <label for="backgroundBlur"
+                >Blur Amount: <span id="blurAmount"></span
+              ></label>
+              <input
+                disabled
+                type="range"
+                id="backgroundBlur"
+                name="backgroundBlur"
+                min="1"
+                max="10"
+                value="4"
+                step="1"
+              />
+            </div>
+            <div class="customization">
+              <label for="edgeBlur"
+                >Edge Blur Amount: <span id="edgeBlurAmount"></span
+              ></label>
+              <input
+                disabled
+                type="range"
+                id="edgeBlur"
+                name="edgeBlur"
+                min="1"
+                max="10"
+                value="4"
+                step="1"
+              />
+            </div>
+          </div>
+        </div>
+      </section>
           </td>
         </tr>
         <tr>
@@ -41,7 +107,9 @@
           <td align="center">
             <button id="sendButton" disabled>Send</button>
           </td>
-          <td></td>
+          <td>
+            
+          </td>
         </tr>
       </table>
     </div>
