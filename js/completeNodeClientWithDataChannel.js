@@ -31,6 +31,7 @@ var isStarted = false;
 // Streams
 var localStream;
 var remoteStream;
+var originalStream;
 // PeerConnection
 var pc;
 
@@ -63,6 +64,7 @@ var constraints = { video: true, audio: true };
 // getUserMedia() handlers...
 function handleUserMedia(stream) {
   localStream = stream;
+  originalStream = stream;
   //attachMediaStream(localVideo, stream);
   if (window.URL) {
     if ("srcObject" in localVideo) {
@@ -318,3 +320,269 @@ function stop() {
   pc = null;
   sendButton.disabled = true;
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+let vectorlyFilter = null;
+let selectedLibrary = "bodypix";
+let selectedBackground = null;
+let blurredEnabled = false;
+let isNone = false;
+let virtualBackgroundEnabled = false;
+let selfieSegmentation = null;
+let libraryLoaded = false;
+
+const canvasOutput = document.getElementById("localCanvas");
+const ctx = canvasOutput.getContext("2d");
+
+const segmentationWidth = 480;
+const segmentationHeight = 320;
+const segmentationPixelCount = segmentationWidth * segmentationHeight;
+const segmentationMask = new ImageData(segmentationWidth, segmentationHeight);
+const segmentationMaskCanvas = document.createElement("canvas");
+segmentationMaskCanvas.width = segmentationWidth;
+segmentationMaskCanvas.height = segmentationHeight;
+const segmentationMaskCtx = segmentationMaskCanvas.getContext("2d");
+
+const librarySelect = document.getElementById("librarySelect");
+const noBackgroundBtn = document.getElementById("noBackground");
+const blurBackgroundBtn = document.getElementById("blurBackground");
+const virutalBackgroundBtn = document.getElementById("virutalBackground");
+const backgroundBlurRange = document.getElementById("backgroundBlur");
+const blurAmountText = document.getElementById("blurAmount");
+blurAmountText.innerText = backgroundBlurRange.value;
+
+const edgeBlurRange = document.getElementById("edgeBlur");
+const edgeBlurAmountText = document.getElementById("edgeBlurAmount");
+edgeBlurAmountText.innerText = edgeBlurRange.value;
+
+//#endregion
+
+//#region Bodypix
+async function loadBodyPix() {
+  try {
+    const net = await bodyPix.load();
+    canvasOutput.hidden = false;
+    perform(net);
+  } catch (err) {
+    console.log(err);
+  }
+}
+
+async function perform(net) {
+  while (
+    selectedLibrary === "bodypix" &&
+    (blurredEnabled || virtualBackgroundEnabled)
+  ) {
+    segmentationMaskCtx.clearRect(
+      0,
+      0,
+      canvasOutput.width,
+      canvasOutput.height
+    );
+    segmentationMaskCtx.drawImage(
+      localVideo,
+      0,
+      0,
+      canvasOutput.width,
+      canvasOutput.height
+    );
+
+    const segmentation = await net.segmentPerson(segmentationMaskCanvas);
+    for (let i = 0; i < segmentationPixelCount; i++) {
+      // Sets only the alpha component of each pixel
+      segmentationMask.data[i * 4 + 3] = segmentation.data[i] ? 255 : 0;
+    }
+    segmentationMaskCtx.putImageData(segmentationMask, 0, 0);
+
+    runPostProcessing(
+      localVideo,
+      segmentationMaskCanvas,
+      backgroundBlurRange.value
+    );
+  }
+}
+//#endregion
+
+function runPostProcessing(image, segmentation, blurAmount) {
+  clearCanvas();
+
+  ctx.globalCompositeOperation = "copy";
+  ctx.filter = "none";
+
+  if (blurredEnabled || virtualBackgroundEnabled) {
+    ctx.filter = `blur(${edgeBlurRange.value}px)`;
+    drawSegmentationMask(segmentation);
+    ctx.globalCompositeOperation = "source-in";
+    ctx.filter = "none";
+  }
+
+  ctx.drawImage(image, 0, 0, canvasOutput.width, canvasOutput.height);
+
+  if (virtualBackgroundEnabled) {
+    blurBackground(selectedBackground, 0);
+  }
+
+  if (blurredEnabled) {
+    if (isNone) {
+      blurAmount = 0;
+    }
+    blurBackground(image, blurAmount);
+  }
+
+  ctx.restore();
+}
+
+function drawSegmentationMask(segmentation) {
+  ctx.drawImage(segmentation, 0, 0, canvasOutput.width, canvasOutput.height);
+}
+
+function blurBackground(image, blurAmount) {
+  ctx.globalCompositeOperation = "destination-over";
+  ctx.filter = `blur(${blurAmount}px)`;
+  ctx.drawImage(image, 0, 0, canvasOutput.width, canvasOutput.height);
+}
+
+function clearCanvas() {
+  ctx.clearRect(0, 0, canvasOutput.width, canvasOutput.height);
+}
+
+/* eslint-disable default-case */
+function onLibraryLoad(library) {
+  libraryLoaded = true;
+  switch (library) {
+    case "bodypix":
+      loadBodyPix();
+      setResultStream();
+      break;
+  }
+
+  if (library === "bodypix") {
+    backgroundBlurRange.max = 20;
+  } else {
+    if (backgroundBlurRange.value > 10) {
+      backgroundBlurRange.value = 10;
+      blurAmountText.innerText = backgroundBlurRange.value;
+    }
+
+    backgroundBlurRange.max = 10;
+  }
+}
+
+/* eslint-disable default-case */
+async function onLibraryUnload(library) {
+  clearCanvas();
+
+  switch (library) {
+    case "bodypix":
+      localVideo.hidden = false;
+      canvasOutput.hidden = true;
+      break;
+  }
+
+  const stream = localVideo.captureStream();
+  pc.addStream(stream);
+  pc.createOffer(setLocalAndSendMessage, onSignalingError, sdpConstraints);
+  libraryLoaded = false;
+}
+
+function setResultStream() {
+  localVideo.hidden = true;
+  const stream = canvasOutput.captureStream();
+  pc.addStream(stream);
+  pc.createOffer(setLocalAndSendMessage, onSignalingError, sdpConstraints);
+}
+
+noBackgroundBtn.addEventListener("click", (e) => {
+  blurredEnabled = true;
+  isNone = true;
+  virtualBackgroundEnabled = false;
+  backgroundBlurRange.disabled = true;
+  edgeBlurRange.disabled = true;
+
+  noBackgroundBtn.classList.add("selected");
+  blurBackgroundBtn.classList.remove("selected");
+  virutalBackgroundBtn.classList.remove("selected");
+
+  if (!libraryLoaded) {
+    onLibraryLoad(librarySelect.value);
+  }
+  // onLibraryLoad(librarySelect.value);
+});
+
+blurBackgroundBtn.addEventListener("click", (e) => {
+  blurredEnabled = true;
+  isNone = false;
+  virtualBackgroundEnabled = false;
+  backgroundBlurRange.disabled = false;
+
+  if (selectedLibrary !== "vectorly") {
+    edgeBlurRange.disabled = false;
+  } else {
+    edgeBlurRange.disabled = true;
+  }
+
+  noBackgroundBtn.classList.remove("selected");
+  blurBackgroundBtn.classList.add("selected");
+  virutalBackgroundBtn.classList.remove("selected");
+
+  if (!libraryLoaded) {
+    console.log(1);
+    onLibraryLoad(librarySelect.value);
+  } else if (selectedLibrary === "vectorly") {
+    changeBackground("blur");
+  }
+});
+
+virutalBackgroundBtn.addEventListener("click", (e) => {
+  blurredEnabled = false;
+  virtualBackgroundEnabled = true;
+  backgroundBlurRange.disabled = true;
+
+  if (selectedLibrary !== "vectorly") {
+    edgeBlurRange.disabled = false;
+  } else {
+    edgeBlurRange.disabled = true;
+  }
+
+  noBackgroundBtn.classList.remove("selected");
+  blurBackgroundBtn.classList.remove("selected");
+  virutalBackgroundBtn.classList.add("selected");
+
+  selectedBackground = e.target;
+
+  if (!libraryLoaded) {
+    console.log(1);
+    onLibraryLoad(librarySelect.value);
+  } else if (selectedLibrary === "vectorly") {
+    changeBackground(selectedBackground.src);
+  }
+});
+
+librarySelect.addEventListener("input", (e) => {
+  if (selectedLibrary !== e.target.value) {
+    onLibraryUnload(selectedLibrary);
+  }
+
+  selectedLibrary = e.target.value;
+
+  if (!blurredEnabled && !virtualBackgroundEnabled) return;
+
+  if (selectedLibrary === "vectorly") {
+    edgeBlurRange.disabled = true;
+  }
+
+  onLibraryLoad(e.target.value);
+});
+
+backgroundBlurRange.addEventListener("input", (e) => {
+  blurAmountText.innerText = e.target.value;
+
+  if (selectedLibrary === "vectorly") {
+    vectorlyFilter.changeBlurRadius(e.target.value);
+  }
+});
+
+edgeBlurRange.addEventListener("input", (e) => {
+  edgeBlurAmountText.innerText = e.target.value;
+});
