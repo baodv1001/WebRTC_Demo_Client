@@ -28,13 +28,14 @@ sendButton.onclick = sendData;
 var isChannelReady = false;
 var isInitiator = false;
 var isStarted = false;
+var numClients = 0;
+var listPc = [];
 // WebRTC data structures
 // Streams
 var localStream;
 var remoteStream;
 var originalStream;
 // PeerConnection
-var pc;
 
 // PeerConnection ICE protocol configuration (either Firefox or Chrome)
 var pc_config =
@@ -53,6 +54,10 @@ var room = prompt("Enter room name:");
 var socket = io("https://webrtc-demo-se400.herokuapp.com/", {
   transports: ["websocket"],
 });
+
+// var socket = io("http://localhost:8181", {
+//   transports: ["websocket"],
+// });
 
 // Send 'Create or join' message to singnaling server
 if (room !== "") {
@@ -108,8 +113,9 @@ socket.on("join", function (room) {
 });
 // Handle 'joined' message coming back from server:
 // this is the second peer joining the channel
-socket.on("joined", function (room) {
-  console.log("This peer has joined room " + room);
+socket.on("joined", function (numClient) {
+  console.log("This peer has joined room " + numClient);
+  numClients = numClient;
   isChannelReady = true;
   // Call getUserMedia()
   navigator.getUserMedia(constraints, handleUserMedia, handleUserMediaError);
@@ -122,50 +128,107 @@ socket.on("log", function (array) {
 // Receive message from the other peer via the signaling server
 socket.on("message", function (message) {
   console.log("Received message:", message);
-  if (message === "got user media") {
-    checkAndStart();
-  } else if (message.type === "offer") {
-    if (!isInitiator && !isStarted) {
-      checkAndStart();
+  if (message.message === "got user media") {
+    checkAndStart(message.destinationId);
+  } else if (message.message.type === "offer") {
+    // if (!isInitiator && !isStarted) {
+    //   checkAndStart();
+    // }
+    isStarted = true;
+    if (!message.isSendAll) {
+      var newPeer = createPeerConnection(listPc.length);
+      listPc.push({
+        pc: newPeer,
+        destinationId: message.destinationId,
+        sourceId: socket.id,
+      });
+      newPeer.setRemoteDescription(new RTCSessionDescription(message.message));
+      doAnswer(newPeer, message.index, message.destinationId);
+    } else {
+      listPc.map((item) => {
+        if (item.destinationId == message.sourceId) {
+          item.pc.setRemoteDescription(
+            new RTCSessionDescription(message.message)
+          );
+          doAnswer(item.pc, message.index, message.destinationId);
+        }
+      });
     }
-    pc.setRemoteDescription(new RTCSessionDescription(message));
-    doAnswer();
-  } else if (message.type === "answer" && isStarted) {
-    pc.setRemoteDescription(new RTCSessionDescription(message));
-  } else if (message.type === "candidate" && isStarted) {
-    var candidate = new RTCIceCandidate({
-      sdpMLineIndex: message.label,
-      candidate: message.candidate,
+  } else if (message.message.type === "answer" && isStarted) {
+    console.log(message);
+    listPc.map((item) => {
+      if (item.destinationId === message.sourceId) {
+        item.pc.setRemoteDescription(
+          new RTCSessionDescription(message.message)
+        );
+      }
     });
-    pc.addIceCandidate(candidate);
-  } else if (message === "bye" && isStarted) {
-    handleRemoteHangup();
+  } else if (message.message.type === "candidate" && isStarted) {
+    var candidate = new RTCIceCandidate({
+      sdpMLineIndex: message.message.label,
+      candidate: message.message.candidate,
+    });
+    listPc.map((item) => {
+      if (item.pc && item.pc.remoteDescription) {
+        item.pc.addIceCandidate(candidate);
+      }
+    });
+    // pc.addIceCandidate(candidate);
+  } else if (message.message === "bye") {
+    handleRemoteHangup(message.sourceId);
   }
 });
 // 2. Client-->Server
 // Send message to the other peer via the signaling server
-function sendMessage(message) {
-  console.log("Sending message: ", message);
-  socket.emit("message", { message, room });
+function sendMessage(
+  message,
+  index = -1,
+  destinationId = null,
+  isSendAll = false
+) {
+  console.log("Sending message: ", {
+    message,
+    room,
+    index,
+    sourceId: socket.id,
+    destinationId: destinationId,
+    isSendAll: isSendAll,
+  });
+  socket.emit("message", {
+    message: message,
+    room: room,
+    index: index,
+    sourceId: socket.id,
+    destinationId: destinationId,
+    isSendAll: isSendAll,
+  });
 }
 // Channel negotiation trigger function
-function checkAndStart() {
-  if (!isStarted && typeof localStream != "undefined" && isChannelReady) {
+function checkAndStart(destinationId) {
+  if (typeof localStream != "undefined") {
     console.log(isInitiator);
-    createPeerConnection();
+    var newPeer = createPeerConnection(listPc.length);
+    listPc.push({
+      pc: newPeer,
+      destinationId: destinationId,
+      sourceId: socket.id,
+    });
     isStarted = true;
 
-    if (isInitiator) {
-      doCall();
-    }
+    doCall(newPeer, destinationId);
   }
 }
 // PeerConnection management...
-function createPeerConnection() {
+function createPeerConnection(index) {
   try {
-    pc = new RTCPeerConnection(pc_config, pc_constraints);
-    pc.addStream(localStream);
-    pc.onicecandidate = handleIceCandidate;
+    var peerConnection = new RTCPeerConnection(pc_config, pc_constraints);
+    if (!localVideo.hidden) {
+      peerConnection.addStream(localStream);
+    } else {
+      var canvasStream = canvasOutput.captureStream();
+      peerConnection.addStream(canvasStream);
+    }
+    peerConnection.onicecandidate = () => handleIceCandidate(event);
     console.log(
       "Created RTCPeerConnnection with:\n" +
         " config: '" +
@@ -180,24 +243,28 @@ function createPeerConnection() {
     alert("Cannot create RTCPeerConnection object.");
     return;
   }
-  pc.onaddstream = handleRemoteStreamAdded;
-  pc.onremovestream = handleRemoteStreamRemoved;
-  if (isInitiator) {
-    try {
-      // Create a reliable data channel
-      sendChannel = pc.createDataChannel("sendDataChannel", { reliable: true });
-      console.log("Created send data channel");
-    } catch (e) {
-      alert("Failed to create data channel. ");
-      console.log("createDataChannel() failed with exception: " + e.message);
-    }
-    sendChannel.onopen = handleSendChannelStateChange;
-    sendChannel.onmessage = handleMessage;
-    sendChannel.onclose = handleSendChannelStateChange;
-  } else {
-    // Joiner
-    pc.ondatachannel = gotReceiveChannel;
-  }
+  peerConnection.onaddstream = (event) => handleRemoteStreamAdded(event, index);
+  peerConnection.onremovestream = handleRemoteStreamRemoved;
+  // if (isInitiator) {
+  //   try {
+  //     // Create a reliable data channel
+  //     sendChannel = peerConnection.createDataChannel("sendDataChannel", {
+  //       reliable: true,
+  //     });
+  //     console.log("Created send data channel");
+  //   } catch (e) {
+  //     alert("Failed to create data channel. ");
+  //     console.log("createDataChannel() failed with exception: " + e.message);
+  //   }
+  //   sendChannel.onopen = handleSendChannelStateChange;
+  //   sendChannel.onmessage = handleMessage;
+  //   sendChannel.onclose = handleSendChannelStateChange;
+  // } else {
+  //   // Joiner
+  //   peerConnection.ondatachannel = gotReceiveChannel;
+  // }
+
+  return peerConnection;
 }
 // Data channel management
 function sendData() {
@@ -261,40 +328,80 @@ function handleIceCandidate(event) {
   }
 }
 // Create Offer
-function doCall() {
+function doCall(peerConnection, destinationId) {
   console.log("Creating Offer...");
-  pc.createOffer(setLocalAndSendMessage, onSignalingError, sdpConstraints);
+  peerConnection.createOffer(
+    (sessionDescription) =>
+      setLocalAndSendMessage(
+        sessionDescription,
+        peerConnection,
+        listPc.length - 1,
+        destinationId
+      ),
+    onSignalingError,
+    sdpConstraints
+  );
 }
 // Signaling error handler
 function onSignalingError(error) {
   console.log("Failed to create signaling message : " + error.name);
 }
 // Create Answer
-function doAnswer() {
+function doAnswer(peerConnection, index, destinationId) {
   console.log("Sending answer to peer.");
-  pc.createAnswer(setLocalAndSendMessage, onSignalingError, sdpConstraints);
+  peerConnection.createAnswer(
+    (sessionDescription) =>
+      setLocalAndSendMessage(
+        sessionDescription,
+        peerConnection,
+        index,
+        destinationId
+      ),
+    onSignalingError,
+    sdpConstraints
+  );
 }
 // Success handler for both createOffer()
 // and createAnswer()
-function setLocalAndSendMessage(sessionDescription) {
-  pc.setLocalDescription(sessionDescription);
-  sendMessage(sessionDescription);
+function setLocalAndSendMessage(
+  sessionDescription,
+  peerConnection,
+  index,
+  destinationId = null,
+  isSendAll = false
+) {
+  console.log("setLocalAndSendMessage", sessionDescription);
+  console.log("peerConnection", peerConnection);
+  peerConnection.setLocalDescription(sessionDescription);
+  sendMessage(sessionDescription, index, destinationId, isSendAll);
 }
 // Remote stream handlers...
-function handleRemoteStreamAdded(event) {
-  console.log("Remote stream added.");
+function handleRemoteStreamAdded(event, index) {
+  var video = document.getElementById("video" + index);
+  if (!video) {
+    console.log("Remote stream added.");
+    video = document.createElement("video");
+    video.setAttribute("id", "video" + index);
+    video.muted = false;
+    video.height = 240; // in px
+    video.width = 320; // in px
+    video.autoplay = true;
+    const td = document.getElementById("test");
+    td.appendChild(video);
+  }
+
   //attachMediaStream(remoteVideo, event.stream);
   if (window.URL) {
-    if ("srcObject" in remoteVideo) {
-      remoteVideo.srcObject = event.stream;
+    if ("srcObject" in video) {
+      video.srcObject = event.stream;
     } else {
-      remoteVideo.src = window.URL.createObjectURL(event.stream);
+      video.src = window.URL.createObjectURL(event.stream);
     }
   } else {
-    remoteVideo.src = event.stream;
+    video.src = event.stream;
   }
   console.log("Remote stream attached!!.");
-  remoteStream = event.stream;
+  video = event.stream;
 }
 
 function handleRemoteStreamRemoved(event) {
@@ -304,21 +411,34 @@ function handleRemoteStreamRemoved(event) {
 function hangup() {
   console.log("Hanging up.");
   stop();
-  sendMessage("bye");
+  listPc.map((item) => {
+    sendMessage("bye", -1, item.destinationId);
+  });
 }
-function handleRemoteHangup() {
+function handleRemoteHangup(remoteSocketId) {
   console.log("Session terminated.");
-  stop();
+  stop(remoteSocketId);
   receiveTextarea.value = null;
   sendTextarea.value = null;
   // isInitiator = false;
 }
-function stop() {
+function stop(remoteSocketId) {
   isStarted = false;
   if (sendChannel) sendChannel.close();
   if (receiveChannel) receiveChannel.close();
-  if (pc) pc.close();
-  pc = null;
+  listPc.map((item, index) => {
+    console.log(item.destinationId);
+    console.log(remoteSocketId);
+    console.log(index);
+    if (item.destinationId === remoteSocketId) {
+      if (item.pc) {
+        item.pc.close();
+        item.pc = null;
+        const video = document.getElementById("video" + index);
+        video.remove();
+      }
+    }
+  });
   sendButton.disabled = true;
 }
 
@@ -482,16 +602,45 @@ async function onLibraryUnload(library) {
   }
 
   const stream = localVideo.captureStream();
-  pc.addStream(stream);
-  pc.createOffer(setLocalAndSendMessage, onSignalingError, sdpConstraints);
+  listPc.map((item, index) => {
+    item.pc.addStream(stream);
+    item.pc.createOffer(
+      (sessionDescription) =>
+        setLocalAndSendMessage(
+          sessionDescription,
+          item.pc,
+          index,
+          item.destinationId,
+          true
+        ),
+      onSignalingError,
+      sdpConstraints
+    );
+  });
+
   libraryLoaded = false;
 }
 
 function setResultStream() {
   localVideo.hidden = true;
   const stream = canvasOutput.captureStream();
-  pc.addStream(stream);
-  pc.createOffer(setLocalAndSendMessage, onSignalingError, sdpConstraints);
+
+  console.log(stream);
+  listPc.map((item, index) => {
+    item.pc.addStream(stream);
+    item.pc.createOffer(
+      (sessionDescription) =>
+        setLocalAndSendMessage(
+          sessionDescription,
+          item.pc,
+          index,
+          item.destinationId,
+          true
+        ),
+      onSignalingError,
+      sdpConstraints
+    );
+  });
 }
 
 noBackgroundBtn.addEventListener("click", (e) => {
