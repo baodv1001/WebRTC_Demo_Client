@@ -42,7 +42,31 @@ var pc_config =
   //   webrtcDetectedBrowser === "firefox"
   // ? { iceServers: [{ url: "stun:23.21.150.121" }] } // IP address
   // :
-  { iceServers: [{ url: "stun:stun.l.google.com:19302" }] };
+  {
+    iceServers: [
+      { url: "stun:stun.l.google.com:19302" },
+      {
+        urls: "turn:openrelay.metered.ca:80",
+        username: "openrelayproject",
+        credential: "openrelayproject",
+      },
+      {
+        urls: "turn:openrelay.metered.ca:443",
+        username: "openrelayproject",
+        credential: "openrelayproject",
+      },
+      {
+        urls: "turn:openrelay.metered.ca:443?transport=tcp",
+        username: "openrelayproject",
+        credential: "openrelayproject",
+      },
+      {
+        url: "turn:numb.viagenie.ca",
+        credential: "muazkh",
+        username: "webrtc@live.com",
+      },
+    ],
+  };
 
 var pc_constraints = {
   optional: [{ DtlsSrtpKeyAgreement: true }],
