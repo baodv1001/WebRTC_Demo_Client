@@ -50,7 +50,7 @@ var sdpConstraints = {};
 // Let's get started: prompt user for input (room name)
 var room = prompt("Enter room name:");
 // Connect to signaling server
-var socket = io("https://webrtc-demo-se400.herokuapp.com/", {
+var socket = io("https://webrtc-demo-server.onrender.com/", {
   transports: ["websocket"],
 });
 
