@@ -11,7 +11,7 @@
         <tr>
           <th>Local video</th>
           <th>Remote video</th>
-          <th>Remote video</th>
+          
         </tr>
         <tr>
           <td>
@@ -30,9 +30,6 @@
             </div>
             <!-- <video id="remoteVideo" autoplay></video>
             <canvas hidden id="remoteCanvas" width="480" height="320"></canvas> -->
-          </td>
-          <td >
-            
           </td>
         </tr>
         <tr>
@@ -99,15 +96,14 @@
               rows="4"
               cols="60"
               id="dataChannelSend"
+              title="dataChannelSend"
               disabled
-              placeholder="This will be enabled once
- the data channel is up..."
-            >
-            </textarea>
+            ></textarea>
+              <!-- placeholder="This will be enabled once
+ the data channel is up..." -->
           </td>
           <td align="center">
-            <textarea rows="4" cols="60" id="dataChannelReceive" disabled>
-            </textarea>
+            <textarea rows="4" cols="60" title="dataChannelReceive" id="dataChannelReceive" disabled></textarea>
           </td>
         </tr>
         <tr>
@@ -120,9 +116,7 @@
         </tr>
       </table>
     </div>
-    <!-- <script src="https://webrtc-demo-se400.herokuapp.com:8181/socket.io/socket.io.js"></script> -->
     <script src="./node_modules/webrtc-adapter\out\adapter.js"></script>
-    <!-- <script src="js/completeNodeClientWithDataChannel.js"></script> -->
     <script src="bundle.js"></script>
     <!-- Load TensorFlow.js -->
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@1.2"></script>
