@@ -15,7 +15,7 @@ window.onbeforeunload = function (e) {
   hangup();
 };
 // Data channel information
-var sendChannel, receiveChannel;
+// var sendChannel, receiveChannel;
 var sendButton = document.getElementById("sendButton");
 var sendTextarea = document.getElementById("dataChannelSend");
 var receiveTextarea = document.getElementById("dataChannelReceive");
@@ -30,6 +30,8 @@ var isInitiator = false;
 var isStarted = false;
 var numClients = 0;
 var listPc = [];
+var listSendDataChannel = [];
+var listRecieveChannel = [];
 // WebRTC data structures
 // Streams
 var localStream;
@@ -75,13 +77,13 @@ var sdpConstraints = {};
 // Let's get started: prompt user for input (room name)
 var room = prompt("Enter room name:");
 // Connect to signaling server
-var socket = io("https://webrtc-demo-server.onrender.com/", {
-  transports: ["websocket"],
-});
-
-// var socket = io("http://localhost:8181", {
+// var socket = io("https://webrtc-demo-server.onrender.com/", {
 //   transports: ["websocket"],
 // });
+
+var socket = io("http://localhost:8181", {
+  transports: ["websocket"],
+});
 
 // Send 'Create or join' message to singnaling server
 if (room !== "") {
@@ -231,7 +233,7 @@ function sendMessage(
 function checkAndStart(destinationId) {
   if (typeof localStream != "undefined") {
     console.log(isInitiator);
-    var newPeer = createPeerConnection(listPc.length);
+    var newPeer = createPeerConnection(listPc.length, true);
     listPc.push({
       pc: newPeer,
       destinationId: destinationId,
@@ -243,7 +245,7 @@ function checkAndStart(destinationId) {
   }
 }
 // PeerConnection management...
-function createPeerConnection(index) {
+function createPeerConnection(index, isFromOffer = false) {
   try {
     var peerConnection = new RTCPeerConnection(pc_config, pc_constraints);
     if (!localVideo.hidden) {
@@ -269,48 +271,66 @@ function createPeerConnection(index) {
   }
   peerConnection.onaddstream = (event) => handleRemoteStreamAdded(event, index);
   peerConnection.onremovestream = handleRemoteStreamRemoved;
-  // if (isInitiator) {
-  //   try {
-  //     // Create a reliable data channel
-  //     sendChannel = peerConnection.createDataChannel("sendDataChannel", {
-  //       reliable: true,
-  //     });
-  //     console.log("Created send data channel");
-  //   } catch (e) {
-  //     alert("Failed to create data channel. ");
-  //     console.log("createDataChannel() failed with exception: " + e.message);
-  //   }
-  //   sendChannel.onopen = handleSendChannelStateChange;
-  //   sendChannel.onmessage = handleMessage;
-  //   sendChannel.onclose = handleSendChannelStateChange;
-  // } else {
-  //   // Joiner
-  //   peerConnection.ondatachannel = gotReceiveChannel;
-  // }
+  if (isFromOffer) {
+    try {
+      // Create a reliable data channel
+      var newSendChannel = peerConnection.createDataChannel(
+        "sendDataChannel" + index,
+        {
+          reliable: true,
+        }
+      );
+      console.log("Created send data channel");
+    } catch (e) {
+      alert("Failed to create data channel. ");
+      console.log("createDataChannel() failed with exception: " + e.message);
+    }
+    newSendChannel.onopen = () => handleSendChannelStateChange(newSendChannel);
+    newSendChannel.onmessage = handleMessage;
+    newSendChannel.onclose = () => handleSendChannelStateChange(newSendChannel);
+
+    listSendDataChannel.push(newSendChannel);
+  } else {
+    // Joiner
+    peerConnection.ondatachannel = gotReceiveChannel;
+  }
 
   return peerConnection;
 }
 // Data channel management
 function sendData() {
   var data = sendTextarea.value;
-  if (isInitiator) sendChannel.send(data);
-  else receiveChannel.send(data);
+  // if (isInitiator) sendChannel.send(data);
+  // else receiveChannel.send(data);
+
+  receiveTextarea.value += "You: " + data + "\n";
+
+  listSendDataChannel.map((sendDataChannel) => {
+    sendDataChannel.send(data);
+  });
+
+  listRecieveChannel.map((receiveDataChannel) => {
+    receiveDataChannel.send(data);
+  });
   console.log("Sent data: " + data);
 }
 // Handlers...
 function gotReceiveChannel(event) {
   console.log("Receive Channel Callback");
-  receiveChannel = event.channel;
-  receiveChannel.onmessage = handleMessage;
-  receiveChannel.onopen = handleReceiveChannelStateChange;
-  receiveChannel.onclose = handleReceiveChannelStateChange;
+  var newReceiveChannel = event.channel;
+  newReceiveChannel.onmessage = handleMessage;
+  newReceiveChannel.onopen = () =>
+    handleReceiveChannelStateChange(newReceiveChannel);
+  newReceiveChannel.onclose = () =>
+    handleReceiveChannelStateChange(newReceiveChannel);
+  listRecieveChannel.push(newReceiveChannel);
 }
 function handleMessage(event) {
   console.log("Received message: " + event.data);
-  receiveTextarea.value = event.data + "\n";
+  receiveTextarea.value += event.data + "\n";
 }
-function handleSendChannelStateChange() {
-  var readyState = sendChannel.readyState;
+function handleSendChannelStateChange(sendDataChannel) {
+  var readyState = sendDataChannel.readyState;
   console.log("Send channel state is: " + readyState);
   // If channel ready, enable user's input
   if (readyState == "open") {
@@ -323,7 +343,7 @@ function handleSendChannelStateChange() {
     sendButton.disabled = true;
   }
 }
-function handleReceiveChannelStateChange() {
+function handleReceiveChannelStateChange(receiveChannel) {
   var readyState = receiveChannel.readyState;
   console.log("Receive channel state is: " + readyState);
   // If channel ready, enable user's input
@@ -448,6 +468,7 @@ function handleRemoteHangup(remoteSocketId) {
 }
 function stop(remoteSocketId) {
   isStarted = false;
+
   if (sendChannel) sendChannel.close();
   if (receiveChannel) receiveChannel.close();
   listPc.map((item, index) => {
