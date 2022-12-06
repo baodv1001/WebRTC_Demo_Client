@@ -77,13 +77,13 @@ var sdpConstraints = {};
 // Let's get started: prompt user for input (room name)
 var room = prompt("Enter room name:");
 // Connect to signaling server
-// var socket = io("https://webrtc-demo-server.onrender.com/", {
-//   transports: ["websocket"],
-// });
-
-var socket = io("http://localhost:8181", {
+var socket = io("https://webrtc-demo-server.onrender.com/", {
   transports: ["websocket"],
 });
+
+// var socket = io("http://localhost:8181", {
+//   transports: ["websocket"],
+// });
 
 // Send 'Create or join' message to singnaling server
 if (room !== "") {
