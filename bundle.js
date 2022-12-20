@@ -76,6 +76,8 @@ var pc_constraints = {
 var sdpConstraints = {};
 // Let's get started: prompt user for input (room name)
 var room = prompt("Enter room name:");
+
+var name = prompt("Enter your name:");
 // Connect to signaling server
 var socket = io("https://webrtc-demo-server.onrender.com/", {
   transports: ["websocket"],
@@ -155,14 +157,14 @@ socket.on("log", function (array) {
 socket.on("message", function (message) {
   console.log("Received message:", message);
   if (message.message === "got user media") {
-    checkAndStart(message.destinationId);
+    checkAndStart(message.destinationId, message.name);
   } else if (message.message.type === "offer") {
     // if (!isInitiator && !isStarted) {
     //   checkAndStart();
     // }
     isStarted = true;
     if (!message.isSendAll) {
-      var newPeer = createPeerConnection(listPc.length);
+      var newPeer = createPeerConnection(listPc.length, message.name);
       listPc.push({
         pc: newPeer,
         destinationId: message.destinationId,
@@ -221,6 +223,7 @@ function sendMessage(
     isSendAll: isSendAll,
   });
   socket.emit("message", {
+    name: name,
     message: message,
     room: room,
     index: index,
@@ -230,10 +233,10 @@ function sendMessage(
   });
 }
 // Channel negotiation trigger function
-function checkAndStart(destinationId) {
+function checkAndStart(destinationId, name) {
   if (typeof localStream != "undefined") {
     console.log(isInitiator);
-    var newPeer = createPeerConnection(listPc.length, true);
+    var newPeer = createPeerConnection(listPc.length, name, true);
     listPc.push({
       pc: newPeer,
       destinationId: destinationId,
@@ -245,7 +248,7 @@ function checkAndStart(destinationId) {
   }
 }
 // PeerConnection management...
-function createPeerConnection(index, isFromOffer = false) {
+function createPeerConnection(index, name, isFromOffer = false) {
   try {
     var peerConnection = new RTCPeerConnection(pc_config, pc_constraints);
     if (!localVideo.hidden) {
@@ -269,7 +272,8 @@ function createPeerConnection(index, isFromOffer = false) {
     alert("Cannot create RTCPeerConnection object.");
     return;
   }
-  peerConnection.onaddstream = (event) => handleRemoteStreamAdded(event, index);
+  peerConnection.onaddstream = (event) =>
+    handleRemoteStreamAdded(event, index, name);
   peerConnection.onremovestream = handleRemoteStreamRemoved;
   if (isFromOffer) {
     try {
@@ -299,11 +303,14 @@ function createPeerConnection(index, isFromOffer = false) {
 }
 // Data channel management
 function sendData() {
-  var data = sendTextarea.value;
+  var data = { message: sendTextarea.value, name: name };
+  // var data = sendTextarea.value;
   // if (isInitiator) sendChannel.send(data);
   // else receiveChannel.send(data);
 
-  receiveTextarea.value += "You: " + data + "\n";
+  receiveTextarea.value += "You: " + data.message + "\n";
+
+  data = JSON.stringify(data);
 
   listSendDataChannel.map((sendDataChannel) => {
     sendDataChannel.send(data);
@@ -313,10 +320,13 @@ function sendData() {
     receiveDataChannel.send(data);
   });
   console.log("Sent data: " + data);
+
+  sendTextarea.value = "";
 }
 // Handlers...
 function gotReceiveChannel(event) {
   console.log("Receive Channel Callback");
+  console.log(event);
   var newReceiveChannel = event.channel;
   newReceiveChannel.onmessage = handleMessage;
   newReceiveChannel.onopen = () =>
@@ -327,7 +337,8 @@ function gotReceiveChannel(event) {
 }
 function handleMessage(event) {
   console.log("Received message: " + event.data);
-  receiveTextarea.value += event.data + "\n";
+  var data = JSON.parse(event.data);
+  receiveTextarea.value += data.name + ": " + data.message + "\n";
 }
 function handleSendChannelStateChange(sendDataChannel) {
   var readyState = sendDataChannel.readyState;
@@ -420,18 +431,40 @@ function setLocalAndSendMessage(
   sendMessage(sessionDescription, index, destinationId, isSendAll);
 }
 // Remote stream handlers...
-function handleRemoteStreamAdded(event, index) {
+function handleRemoteStreamAdded(event, index, name) {
   var video = document.getElementById("video" + index);
   if (!video) {
     console.log("Remote stream added.");
+
+    var divTag = document.createElement("div");
+    divTag.setAttribute("id", "div" + index);
+    divTag.setAttribute("class", "videoContainer");
+    divTag.style.cssText +=
+      "position: relative; width: 320px; display: inline-block; margin: 10px;";
+
+    var nameTag = document.createElement("p");
+    nameTag.innerHTML = name;
+
+    var divOverlay = document.createElement("div");
+    divOverlay.setAttribute("class", "overlay");
+    divOverlay.style.cssText +=
+      "position: absolute; bottom: 0; left: 10px; z-index:1; color: white; font-size: 24px;";
+    divOverlay.appendChild(nameTag);
+
+    divTag.appendChild(divOverlay);
+
     video = document.createElement("video");
     video.setAttribute("id", "video" + index);
     video.muted = false;
     video.height = 240; // in px
     video.width = 320; // in px
     video.autoplay = true;
-    const td = document.getElementById("test");
-    td.appendChild(video);
+    video.style.cssText += "position: relative; z-index: 0;";
+
+    divTag.appendChild(video);
+
+    const td = document.getElementById("remoteContainer");
+    td.appendChild(divTag);
   }
 
   //attachMediaStream(remoteVideo, event.stream);
@@ -702,7 +735,6 @@ noBackgroundBtn.addEventListener("click", (e) => {
   if (!libraryLoaded) {
     onLibraryLoad(librarySelect.value);
   }
-  // onLibraryLoad(librarySelect.value);
 });
 
 blurBackgroundBtn.addEventListener("click", (e) => {
@@ -752,22 +784,6 @@ virutalBackgroundBtn.addEventListener("click", (e) => {
   } else if (selectedLibrary === "vectorly") {
     changeBackground(selectedBackground.src);
   }
-});
-
-librarySelect.addEventListener("input", (e) => {
-  if (selectedLibrary !== e.target.value) {
-    onLibraryUnload(selectedLibrary);
-  }
-
-  selectedLibrary = e.target.value;
-
-  if (!blurredEnabled && !virtualBackgroundEnabled) return;
-
-  if (selectedLibrary === "vectorly") {
-    edgeBlurRange.disabled = true;
-  }
-
-  onLibraryLoad(e.target.value);
 });
 
 backgroundBlurRange.addEventListener("input", (e) => {
