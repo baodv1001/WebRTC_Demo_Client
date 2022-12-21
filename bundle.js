@@ -647,7 +647,7 @@ function clearCanvas() {
 }
 
 /* eslint-disable default-case */
-function onLibraryLoad(library = "bodyPix") {
+function onLibraryLoad(library = "bodypix") {
   libraryLoaded = true;
   switch (library) {
     case "bodypix":
@@ -733,7 +733,7 @@ noBackgroundBtn.addEventListener("click", (e) => {
   virutalBackgroundBtn.classList.remove("selected");
 
   if (!libraryLoaded) {
-    onLibraryLoad();
+    onLibraryLoad("none");
   }
 });
 
