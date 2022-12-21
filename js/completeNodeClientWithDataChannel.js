@@ -8,10 +8,16 @@ navigator.getUserMedia =
   navigator.getUserMedia ||
   navigator.webkitGetUserMedia ||
   navigator.mozGetUserMedia;
+
+var isSendBye = false;
 // Clean-up function:
 // collect garbage before unloading browser's window
 window.onbeforeunload = function (e) {
+  e.preventDefault();
   hangup();
+  if (!isSendBye) {
+    return "Are you sure you want to leave the call?";
+  }
 };
 // Data channel information
 // var sendChannel, receiveChannel;
@@ -163,7 +169,12 @@ socket.on("message", function (message) {
     // }
     isStarted = true;
     if (!message.isSendAll) {
-      var newPeer = createPeerConnection(listPc.length, message.name);
+      var newPeer = createPeerConnection(
+        listPc.length,
+        message.name,
+        false,
+        message.destinationId
+      );
       listPc.push({
         pc: newPeer,
         destinationId: message.destinationId,
@@ -235,7 +246,12 @@ function sendMessage(
 function checkAndStart(destinationId, name) {
   if (typeof localStream != "undefined") {
     console.log(isInitiator);
-    var newPeer = createPeerConnection(listPc.length, name, true);
+    var newPeer = createPeerConnection(
+      listPc.length,
+      name,
+      true,
+      destinationId
+    );
     listPc.push({
       pc: newPeer,
       destinationId: destinationId,
@@ -247,7 +263,12 @@ function checkAndStart(destinationId, name) {
   }
 }
 // PeerConnection management...
-function createPeerConnection(index, name, isFromOffer = false) {
+function createPeerConnection(
+  index,
+  name,
+  isFromOffer = false,
+  destinationId = null
+) {
   try {
     var peerConnection = new RTCPeerConnection(pc_config, pc_constraints);
     if (!localVideo.hidden) {
@@ -274,6 +295,8 @@ function createPeerConnection(index, name, isFromOffer = false) {
   peerConnection.onaddstream = (event) =>
     handleRemoteStreamAdded(event, index, name);
   peerConnection.onremovestream = handleRemoteStreamRemoved;
+  peerConnection.oniceconnectionstatechange = () =>
+    handleConnectionStateChange(peerConnection, destinationId);
   if (isFromOffer) {
     try {
       // Create a reliable data channel
@@ -300,6 +323,13 @@ function createPeerConnection(index, name, isFromOffer = false) {
 
   return peerConnection;
 }
+
+function handleConnectionStateChange(pc, destinationId) {
+  if (pc.iceConnectionState == "disconnected") {
+    handleRemoteHangup(destinationId);
+  }
+}
+
 // Data channel management
 function sendData() {
   var data = { message: sendTextarea.value, name: name };
@@ -490,6 +520,8 @@ function hangup() {
   listPc.map((item) => {
     sendMessage("bye", -1, item.destinationId);
   });
+  isSendBye = true;
+  window.close();
 }
 function handleRemoteHangup(remoteSocketId) {
   console.log("Session terminated.");
@@ -501,8 +533,8 @@ function handleRemoteHangup(remoteSocketId) {
 function stop(remoteSocketId) {
   isStarted = false;
 
-  if (sendChannel) sendChannel.close();
-  if (receiveChannel) receiveChannel.close();
+  // if (sendChannel) sendChannel.close();
+  // if (receiveChannel) receiveChannel.close();
   listPc.map((item, index) => {
     console.log(item.destinationId);
     console.log(remoteSocketId);
@@ -511,7 +543,7 @@ function stop(remoteSocketId) {
       if (item.pc) {
         item.pc.close();
         item.pc = null;
-        const video = document.getElementById("video" + index);
+        const video = document.getElementById("div" + index);
         video.remove();
       }
     }
@@ -542,7 +574,6 @@ segmentationMaskCanvas.width = segmentationWidth;
 segmentationMaskCanvas.height = segmentationHeight;
 const segmentationMaskCtx = segmentationMaskCanvas.getContext("2d");
 
-const librarySelect = document.getElementById("librarySelect");
 const noBackgroundBtn = document.getElementById("noBackground");
 const blurBackgroundBtn = document.getElementById("blurBackground");
 const virutalBackgroundBtn = document.getElementById("virutalBackground");
