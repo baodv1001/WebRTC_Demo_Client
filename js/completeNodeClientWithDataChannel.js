@@ -754,7 +754,7 @@ blurBackgroundBtn.addEventListener("click", (e) => {
 
   if (!libraryLoaded) {
     console.log(1);
-    onLibraryLoad(librarySelect.value);
+    onLibraryLoad();
   } else if (selectedLibrary === "vectorly") {
     changeBackground("blur");
   }
@@ -779,7 +779,7 @@ virutalBackgroundBtn.addEventListener("click", (e) => {
 
   if (!libraryLoaded) {
     console.log(1);
-    onLibraryLoad(librarySelect.value);
+    onLibraryLoad();
   } else if (selectedLibrary === "vectorly") {
     changeBackground(selectedBackground.src);
   }
