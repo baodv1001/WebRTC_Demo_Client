@@ -52,24 +52,26 @@ var pc_config =
   // :
   {
     iceServers: [
-      { url: "stun:stun.l.google.com:19302" },
       {
-        urls: "turn:openrelay.metered.ca:80",
-        username: "openrelayproject",
-        credential: "openrelayproject",
+        urls: "stun:relay.metered.ca:80",
       },
       {
-        urls: "turn:openrelay.metered.ca:443",
-        username: "openrelayproject",
-        credential: "openrelayproject",
+        urls: "turn:relay.metered.ca:80",
+        username: "7d7c879c5731bf89a95eca58",
+        credential: "4yNvRI75cj/sQTNV",
       },
       {
-        urls: "turn:openrelay.metered.ca:443?transport=tcp",
-        username: "openrelayproject",
-        credential: "openrelayproject",
+        urls: "turn:relay.metered.ca:443",
+        username: "7d7c879c5731bf89a95eca58",
+        credential: "4yNvRI75cj/sQTNV",
       },
       {
-        url: "turn:numb.viagenie.ca",
+        urls: "turn:relay.metered.ca:443?transport=tcp",
+        username: "7d7c879c5731bf89a95eca58",
+        credential: "4yNvRI75cj/sQTNV",
+      },
+      {
+        urls: "turn:numb.viagenie.ca",
         credential: "muazkh",
         username: "webrtc@live.com",
       },
@@ -129,7 +131,14 @@ socket.on("created", function (room) {
   console.log("Created room " + room);
   isInitiator = true;
   // Call getUserMedia()
-  navigator.getUserMedia(constraints, handleUserMedia, handleUserMediaError);
+  navigator.mediaDevices.enumerateDevices().then((devices) => {
+    const cams = devices.filter((device) => device.kind == "videoinput");
+    const mics = devices.filter((device) => device.kind == "audioinput");
+
+    const constraints = { video: cams.length > 0, audio: mics.length > 0 };
+    navigator.getUserMedia(constraints, handleUserMedia, handleUserMediaError);
+  });
+  //navigator.getUserMedia(constraints, handleUserMedia, handleUserMediaError);
   console.log("Getting user media with constraints", constraints);
   checkAndStart();
 });
@@ -152,7 +161,14 @@ socket.on("joined", function (numClient) {
   numClients = numClient;
   isChannelReady = true;
   // Call getUserMedia()
-  navigator.getUserMedia(constraints, handleUserMedia, handleUserMediaError);
+  navigator.mediaDevices.enumerateDevices().then((devices) => {
+    const cams = devices.filter((device) => device.kind == "videoinput");
+    const mics = devices.filter((device) => device.kind == "audioinput");
+
+    const constraints = { video: cams.length > 0, audio: mics.length > 0 };
+    navigator.getUserMedia(constraints, handleUserMedia, handleUserMediaError);
+  });
+  //navigator.getUserMedia(constraints, handleUserMedia, handleUserMediaError);
   console.log("Getting user media with constraints", constraints);
 });
 // Server-sent log message...
@@ -578,6 +594,8 @@ const segmentationMaskCtx = segmentationMaskCanvas.getContext("2d");
 const noBackgroundBtn = document.getElementById("noBackground");
 const blurBackgroundBtn = document.getElementById("blurBackground");
 const virutalBackgroundBtn = document.getElementById("virutalBackground");
+const muteBtn = document.getElementById("mute");
+const turnOffCameraBtn = document.getElementById("turnOffCamera");
 const backgroundBlurRange = document.getElementById("backgroundBlur");
 const blurAmountText = document.getElementById("blurAmount");
 blurAmountText.innerText = backgroundBlurRange.value;
@@ -814,6 +832,22 @@ virutalBackgroundBtn.addEventListener("click", (e) => {
     onLibraryLoad();
   } else if (selectedLibrary === "vectorly") {
     changeBackground(selectedBackground.src);
+  }
+});
+
+muteBtn.addEventListener("click", (e) => {
+  if (localStream) {
+    localStream.getAudioTracks()[0].enabled =
+      !localStream.getAudioTracks()[0].enabled;
+    muteBtn.classList.toggle("muted");
+  }
+});
+
+turnOffCameraBtn.addEventListener("click", (e) => {
+  if (localStream) {
+    localStream.getVideoTracks()[0].enabled =
+      !localStream.getVideoTracks()[0].enabled;
+    turnOffCameraBtn.classList.toggle("turned-off");
   }
 });
 
