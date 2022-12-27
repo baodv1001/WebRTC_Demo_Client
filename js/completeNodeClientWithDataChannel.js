@@ -1,3 +1,4 @@
+const e = require("cors");
 const io = require("socket.io-client");
 // Look after different browser vendors' ways of calling the getUserMedia()
 // API method:
@@ -45,37 +46,33 @@ var originalStream;
 // PeerConnection
 
 // PeerConnection ICE protocol configuration (either Firefox or Chrome)
-var pc_config =
-  //   webrtcDetectedBrowser === "firefox"
-  // ? { iceServers: [{ url: "stun:23.21.150.121" }] } // IP address
-  // :
-  {
-    iceServers: [
-      {
-        urls: "stun:relay.metered.ca:80",
-      },
-      {
-        urls: "turn:relay.metered.ca:80",
-        username: "7d7c879c5731bf89a95eca58",
-        credential: "4yNvRI75cj/sQTNV",
-      },
-      {
-        urls: "turn:relay.metered.ca:443",
-        username: "7d7c879c5731bf89a95eca58",
-        credential: "4yNvRI75cj/sQTNV",
-      },
-      {
-        urls: "turn:relay.metered.ca:443?transport=tcp",
-        username: "7d7c879c5731bf89a95eca58",
-        credential: "4yNvRI75cj/sQTNV",
-      },
-      {
-        urls: "turn:numb.viagenie.ca",
-        credential: "muazkh",
-        username: "webrtc@live.com",
-      },
-    ],
-  };
+var pc_config = {
+  iceServers: [
+    {
+      urls: "stun:relay.metered.ca:80",
+    },
+    {
+      urls: "turn:relay.metered.ca:80",
+      username: "7d7c879c5731bf89a95eca58",
+      credential: "4yNvRI75cj/sQTNV",
+    },
+    {
+      urls: "turn:relay.metered.ca:443",
+      username: "7d7c879c5731bf89a95eca58",
+      credential: "4yNvRI75cj/sQTNV",
+    },
+    {
+      urls: "turn:relay.metered.ca:443?transport=tcp",
+      username: "7d7c879c5731bf89a95eca58",
+      credential: "4yNvRI75cj/sQTNV",
+    },
+    {
+      urls: "turn:numb.viagenie.ca",
+      credential: "muazkh",
+      username: "webrtc@live.com",
+    },
+  ],
+};
 
 var pc_constraints = {
   optional: [{ DtlsSrtpKeyAgreement: true }],
@@ -136,9 +133,9 @@ socket.on("created", function (room) {
 
     const constraints = { video: cams.length > 0, audio: mics.length > 0 };
     navigator.getUserMedia(constraints, handleUserMedia, handleUserMediaError);
+    console.log("Getting user media with constraints", constraints);
   });
   //navigator.getUserMedia(constraints, handleUserMedia, handleUserMediaError);
-  console.log("Getting user media with constraints", constraints);
   checkAndStart();
 });
 // Handle 'full' message coming back from server:
@@ -166,9 +163,9 @@ socket.on("joined", function (numClient) {
 
     const constraints = { video: cams.length > 0, audio: mics.length > 0 };
     navigator.getUserMedia(constraints, handleUserMedia, handleUserMediaError);
+    console.log("Getting user media with constraints", constraints);
   });
   //navigator.getUserMedia(constraints, handleUserMedia, handleUserMediaError);
-  console.log("Getting user media with constraints", constraints);
 });
 // Server-sent log message...
 socket.on("log", function (array) {
@@ -505,6 +502,10 @@ function handleRemoteStreamAdded(event, index, name) {
     video.width = 320; // in px
     video.autoplay = true;
     video.style.cssText += "position: relative; z-index: 0;";
+    video.setAttribute(
+      "poster",
+      "https://i.postimg.cc/j5kb1NB4/Unknown-person.jpg"
+    );
 
     divTag.appendChild(video);
 
@@ -515,7 +516,9 @@ function handleRemoteStreamAdded(event, index, name) {
   //attachMediaStream(remoteVideo, event.stream);
   if (window.URL) {
     if ("srcObject" in video) {
-      video.srcObject = event.stream;
+      if (event.stream.getVideoTracks().length > 0) {
+        video.srcObject = event.stream;
+      }
     } else {
       video.src = window.URL.createObjectURL(event.stream);
     }
@@ -835,18 +838,22 @@ virutalBackgroundBtn.addEventListener("click", (e) => {
 });
 
 muteBtn.addEventListener("click", (e) => {
-  if (localStream) {
+  if (localStream && localStream.getAudioTracks().length > 0) {
     localStream.getAudioTracks()[0].enabled =
       !localStream.getAudioTracks()[0].enabled;
-    muteBtn.classList.toggle("muted");
+    if (localStream.getAudioTracks()[0].enabled) muteBtn.innerText = "Mute";
+    else muteBtn.innerText = "Unmute";
   }
 });
 
 turnOffCameraBtn.addEventListener("click", (e) => {
-  if (localStream) {
+  if (localStream && localStream.getVideoTracks().length > 0) {
     localStream.getVideoTracks()[0].enabled =
       !localStream.getVideoTracks()[0].enabled;
     turnOffCameraBtn.classList.toggle("turned-off");
+    if (localStream.getVideoTracks()[0].enabled)
+      turnOffCameraBtn.innerText = "Turn off camera";
+    else turnOffCameraBtn.innerText = "Turn on camera";
   }
 });
 
