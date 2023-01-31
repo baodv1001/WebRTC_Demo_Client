@@ -1,0 +1,118 @@
+.videoContainer {
+  position: relative;
+}
+.videoContainer video {
+  position: relative;
+  z-index: 0;
+}
+.videoContainer .overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1;
+}
+
+#streamDiv {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  /* background-color: #202124; */
+}
+#communicateContainer {
+  height: calc(100% - 100px);
+  display: flex;
+}
+#videoSpace {
+  width: calc(100% - 350px);
+  background-color: #3C4043;
+  display: flex;  
+  flex-wrap: wrap;
+}
+.localContainer {
+  width: 50%;
+  height: 100%;
+}
+.userName {
+  position: absolute;
+  top: 0px;
+  left: 50px;
+  font-size: 1.5rem;
+  color: #c49900    ;
+} 
+#remoteContainer {
+  width: 50%;
+  height: 100%;
+  /* flex-wrap: wrap; */
+}
+
+/* Chat space */
+#chatSpace {
+  flex: 1 ;
+  display: flex;
+  padding: 10px;
+  flex-direction: column;
+}
+#messageContainer {
+  width: 100%;  
+  height: calc(100% - 50px);
+  margin: 0;
+  overflow: hidden;
+}
+#dataChannelReceive{
+  width: 100%;  
+  height: 100%; 
+  overflow: auto;
+  padding-right: 15px;
+}
+#chatArea {
+  display: flex;
+  width: 100%;
+  height: 50px;
+}
+#dataChannelSend {
+  flex: 1;
+  border-radius: 8px;
+  margin-right: 4px;
+  padding: 0 8px;
+  font-size: 1  rem;
+}
+#sendButton {
+  width: 60px;  
+  border: none;
+  background-color: white ;
+  padding: 12px 12px; /* Some padding */
+  font-size: 18px; /* Set a font size */  
+  cursor: pointer; /* Mouse pointer on hover */
+} 
+#sendButton:enabled {
+  color: #006CBE;
+}
+#actionContainer {
+  display: flex ;
+  height: 100px;
+  justify-content: center;
+  align-items: center;
+  /* border: 1px solid black; */
+}
+.controlCard {
+  position:absolute;
+  left: 15px;
+}
+/* Style buttons */
+.btn {
+  background-color: #3C4043;
+  border: none; /* Remove borders */
+  color: white; /* White text */
+  padding: 12px 12px; /* Some padding */
+  font-size: 16px; /* Set a font size */
+  cursor: pointer; /* Mouse pointer on hover */
+  border-radius: 50%; 
+  width: 50px;
+  height: 50px;
+  margin: 0 4px;
+}
+
+/* Darker background on mouse-over */
+.btn:hover {
+  background-color: RoyalBlue;
+}
