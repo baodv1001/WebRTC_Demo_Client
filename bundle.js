@@ -342,6 +342,18 @@ function handleConnectionStateChange(pc, destinationId) {
 	}
 }
 
+function replaceURLs(message) {
+	if (!message) return;
+
+	var urlRegex = /(((https?:\/\/)|(www\.))[^\s]+)/g;
+	return message.replace(urlRegex, function (url) {
+		var hyperlink = url;
+		if (!hyperlink.match("^https?://")) {
+			hyperlink = "http://" + hyperlink;
+		}
+		return '<a href="' + hyperlink + '" target="_blank" rel="noopener noreferrer">' + url + "</a>";
+	});
+}
 // Data channel management
 function sendData() {
 	var data = { message: sendTextarea.value, name: yourNameTxt.value };
@@ -352,7 +364,8 @@ function sendData() {
 	console.log("send data");
 
 	newMessage = document.createElement("p");
-	newMessage.textContent += "You: " + data.message;
+	newMessage.innerHTML = replaceURLs("You: " + data.message);
+	newMessage.style.width = "100%";
 	newMessage.style.wordWrap = "break-word";
 	receiveTextarea.appendChild(newMessage);
 
@@ -384,7 +397,7 @@ function handleMessage(event) {
 	console.log("Received message: " + event.data);
 	var data = JSON.parse(event.data);
 	newMessage = document.createElement("p");
-	newMessage.textContent += data.name + ": " + data.message;
+	newMessage.innerHTML = replaceURLs(data.name + ": " + data.message);
 	newMessage.style.wordWrap = "break-word";
 	receiveTextarea.appendChild(newMessage);
 }
@@ -794,7 +807,7 @@ virutalBackgroundBtn.addEventListener("click", (e) => {
 	blurBackgroundBtn.classList.remove("selected");
 	virutalBackgroundBtn.classList.add("selected");
 
-	selectedBackground = e.target;
+	selectedBackground = document.getElementById("virtualImage");
 
 	if (!libraryLoaded) {
 		console.log(1);
@@ -825,14 +838,6 @@ microBtn.addEventListener("click", (e) => {
 		microBtn.title = "Turn on microphone";
 	}
 });
-
-if (!localStream || localStream.getVideoTracks().length <= 0) {
-	cameraOffBtn.style.display = "block";
-	cameraOnBtn.style.display = "none";
-	cameraBtn.style.backgroundColor = "red";
-	cameraBtn.title = "Turn on camera";
-	cameraBtn.disabled = true;
-}
 
 cameraBtn.addEventListener("click", (e) => {
 	if (localStream && localStream.getVideoTracks().length > 0) {
