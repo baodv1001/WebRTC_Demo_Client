@@ -1,123 +1,93 @@
 <!DOCTYPE html>
 <html>
-  <head>
-    <title>
-      Very simple WebRTC application with a Node.js signaling server
-    </title>
-  </head>
-  <body>
-    <div id="mainDiv">
-      <table border="1" width="100%">
-        <tr>
-          <th>Local video</th>
-          <th>Remote video</th>
-          
-        </tr>
-        <tr>
-          <td>
-            <video id="localVideo" autoplay poster="https://i.postimg.cc/j5kb1NB4/Unknown-person.jpg"></video>
-            <canvas hidden id="localCanvas" width="480" height="320"></canvas>
-            <video
-              hidden
-              id="video-stream"
-              autoplay
-              playsinline
-            ></video>
-          </td>
-          <td>
-            <div id="remoteContainer">
 
-            </div>
-            <!-- <video id="remoteVideo" autoplay></video>
-            <canvas hidden id="remoteCanvas" width="480" height="320"></canvas> -->
-          </td>
-        </tr>
-        <tr>
-          <td>
-            <div class="background card">
-              <div>
-                <h3>Background</h3>
-                <button id="noBackground" title="none">None</button>
-                <button id="blurBackground" title="blur">Blur</button>
-                <button id="virutalBackground" title="image">
-                  <img style="width: 30px; height:30px" crossorigin="anonymous" src="https://i.postimg.cc/yNYTPDTZ/background.jpg" />
-                </button>
-                <button id="mute">Mute</button>
-                <button id="turnOffCamera">Turn Off Camera</button>
-              </div>
-            </div>
-          </td>
-          <td>
-            <div class="controls card">
-          <div>
-            <h3>Controls</h3>
-            <div class="customization">
-              <label for="backgroundBlur"
-                >Blur Amount: <span id="blurAmount"></span
-              ></label>
-              <input
-                disabled
-                type="range"
-                id="backgroundBlur"
-                name="backgroundBlur"
-                min="1"
-                max="10"
-                value="4"
-                step="1"
-              />
-            </div>
-            <div class="customization">
-              <label for="edgeBlur"
-                >Edge Blur Amount: <span id="edgeBlurAmount"></span
-              ></label>
-              <input
-                disabled
-                type="range"
-                id="edgeBlur"
-                name="edgeBlur"
-                min="1"
-                max="10"
-                value="4"
-                step="1"
-              />
-            </div>
+<head>
+  <title>
+    Very simple WebRTC application with a Node.js signaling server
+  </title>
+  <link rel="stylesheet" href="./css/page_home.css">
+  <link rel="stylesheet" href="./css/page_call.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+</head>
+
+<body>
+  <div id="homeDiv">
+    <p id="lblRoom">Room name</p>
+    <input type="text" id="roomName" placeholder="Enter room name">
+    <p id="lblName">Your name</p>
+    <input type="text" id="yourName" placeholder="Enter your name">
+    <button id="joinBtn" type="button" disabled>Join</button>
+  </div>
+  <div id="streamDiv" style="display: none;">
+    <div id="communicateContainer">
+      <div class="box" id="videoSpace">
+        <div class="localContainer">
+          <h4 class="userName">You</h4>
+          <video id="localVideo" autoplay poster="https://i.postimg.cc/j5kb1NB4/Unknown-person.jpg" width="100%"
+            height="100%"></video>
+          <canvas hidden id="localCanvas" width="480" height="320"></canvas>
+          <video hidden id="video-stream" autoplay playsinline></video>
+        </div>
+        <div id="remoteContainer"></div>
+      </div>
+      <div id="chatSpace">
+        <h2>Messages</h2>
+        <div id="messageContainer">
+          <div id="dataChannelReceive">
           </div>
         </div>
-      </section>
-          </td>
-        </tr>
-        <tr>
-          <td align="center">
-            <textarea
-              rows="4"
-              cols="60"
-              id="dataChannelSend"
-              title="dataChannelSend"
-              disabled
-            ></textarea>
-              <!-- placeholder="This will be enabled once
- the data channel is up..." -->
-          </td>
-          <td align="center">
-            <textarea rows="4" cols="60" title="dataChannelReceive" id="dataChannelReceive" disabled></textarea>
-          </td>
-        </tr>
-        <tr>
-          <td align="center">
-            <button id="sendButton" disabled>Send</button>
-          </td>
-          <td>
-            
-          </td>
-        </tr>
-      </table>
+        <div id="chatArea">
+          <input id="dataChannelSend" title="dataChannelSend" placeholder="Enter here"></input>
+          <button id="sendButton" disabled>
+            <i class="fa-solid fa-paper-plane"></i>
+          </button>
+        </div>
+      </div>
     </div>
-    <script src="./node_modules/webrtc-adapter\out\adapter.js"></script>
-    <script src="bundle.js"></script>
-    <href src="./css/index.css"></href>
-    <!-- Load TensorFlow.js -->
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@1.2"></script>
-    <!-- Load BodyPix -->
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/body-pix@2.0"></script>
-  </body>
+    <div id="actionContainer">
+      <div class="controlCard" id="controlCard" hidden>
+        <div class="customization">
+          <label for="backgroundBlur">Blur Amount: <span id="blurAmount"></span></label>
+          <input disabled type="range" id="backgroundBlur" name="backgroundBlur" min="1" max="10" value="4" step="1" />
+        </div>
+        <div class="customization">
+          <label for="edgeBlur">Edge Blur Amount: <span id="edgeBlurAmount"></span></label>
+          <input disabled type="range" id="edgeBlur" name="edgeBlur" min="1" max="10" value="4" step="1" />
+        </div>
+      </div>
+      <div>
+        <button class="btn" id="micro">
+          <i class="fa-solid fa-microphone" id="unmute"></i>
+          <i class="fa-solid fa-microphone-slash" id="mute" style="display: none;"></i>
+        </button>
+        <button id="camera" class="btn">
+          <i class="fa-solid fa-video" id="cameraOn"></i>
+          <i class="fa-solid fa-video-slash" id="cameraOff" style="display: none;"></i>
+        </button>
+        <button class="btn" id="callBtn" title="End call" style="background-color: red;">
+          <i class="fa-solid fa-phone-flip"></i>
+        </button>
+        <button id="blurBackground" class="btn" title="Blur">
+          <i class="fa-solid fa-eye" style="filter: blur(2px);"></i>
+        </button>
+        <button id="virutalBackground" title="Virtual background" class="btn">
+          <i class="fa-regular fa-image"></i>
+          <img style="width: 30px; height:30px" crossorigin="anonymous" hidden id="virtualImage"
+            src="https://i.postimg.cc/yNYTPDTZ/background.jpg" />
+        </button>
+        <button class="btn" id="noBackground" title="Reset">
+          <i class="fas fa-eraser"></i>
+        </button>
+      </div>
+    </div>
+  </div>
+  <script src="./node_modules/webrtc-adapter\out\adapter.js"></script>
+  <script src="bundle.js"></script>
+  <!-- Load TensorFlow.js -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@1.2"></script>
+  <!-- Load BodyPix -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/body-pix@2.0"></script>
+  <script src="https://kit.fontawesome.com/6cd29a1e9e.js" crossorigin="anonymous"></script>
+</body>
+
 </html>
