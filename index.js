@@ -82,9 +82,23 @@ async function loadBodyPix() {
 }
 
 async function perform(net) {
-	while (selectedLibrary === "bodypix" && (blurredEnabled || virtualBackgroundEnabled)) {
-		segmentationMaskCtx.clearRect(0, 0, canvasOutput.width, canvasOutput.height);
-		segmentationMaskCtx.drawImage(source, 0, 0, canvasOutput.width, canvasOutput.height);
+	while (
+		selectedLibrary === "bodypix" &&
+		(blurredEnabled || virtualBackgroundEnabled)
+	) {
+		segmentationMaskCtx.clearRect(
+			0,
+			0,
+			canvasOutput.width,
+			canvasOutput.height
+		);
+		segmentationMaskCtx.drawImage(
+			source,
+			0,
+			0,
+			canvasOutput.width,
+			canvasOutput.height
+		);
 
 		const segmentation = await net.segmentPerson(segmentationMaskCanvas);
 		for (let i = 0; i < segmentationPixelCount; i++) {
@@ -93,7 +107,11 @@ async function perform(net) {
 		}
 		segmentationMaskCtx.putImageData(segmentationMask, 0, 0);
 
-		runPostProcessing(source, segmentationMaskCanvas, backgroundBlurRange.value);
+		runPostProcessing(
+			source,
+			segmentationMaskCanvas,
+			backgroundBlurRange.value
+		);
 	}
 }
 //#endregion
@@ -176,7 +194,11 @@ function createSelfieSegmentation() {
 function onResults(results) {
 	if (selectedLibrary !== "mediapipe") return;
 
-	runPostProcessing(results.image, results.segmentationMask, backgroundBlurRange.value);
+	runPostProcessing(
+		results.image,
+		results.segmentationMask,
+		backgroundBlurRange.value
+	);
 }
 //#endregion
 
