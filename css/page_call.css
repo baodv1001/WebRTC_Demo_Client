@@ -14,13 +14,28 @@
     z-index: 1;
 }
 
+body {
+    font-family: Helvetica, sans-serif;
+}
+
+.textOverlay {
+    position: absolute;
+    top: -2px;
+    margin-left: 12px;
+    z-index: 1;
+    color: white;
+    font-size: 16px;
+    font-family: Helvetica, sans-serif;
+    text-shadow: 4px 4px 6px rgba(1, 54, 129, 0.8);
+}
+
 .outer {
-    border-radius: 28px;
+    border-radius: 18px;
     overflow: hidden;
 }
 
 .outerlocal {
-    border-radius: 28px;
+    border-radius: 18px;
     overflow: hidden;
     align-items: center;
 }
@@ -56,9 +71,9 @@
 .userName {
     position: absolute;
     top: 0px;
-    left: 50px;
+    left: 20px;
     font-size: 1.5rem;
-    color: #c49900;
+    color: #ffc800;
 }
 
 .two {
@@ -67,6 +82,7 @@
 
 .four {
     width: 49%;
+    position: relative;
 }
 
 .nine {
@@ -143,7 +159,7 @@ h2 {
 }
 
 #sendButton:enabled {
-    color: #006CBE;
+    color: #1877F2;
 }
 
 #actionContainer {
@@ -180,7 +196,7 @@ h2 {
 
 /* Darker background on mouse-over */
 .btn:hover {
-    background-color: RoyalBlue;
+    background-color: #1877F2;
 }
 
 .title {
@@ -205,4 +221,13 @@ h2 {
     border-radius: 18px;
     border-bottom-left-radius: 0px;
     margin-right: 40px;
+}
+
+.customization {
+    margin: 10px;
+    align-items: center;
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    accent-color: #1877F2;
 }

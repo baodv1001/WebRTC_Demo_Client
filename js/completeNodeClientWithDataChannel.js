@@ -7,9 +7,7 @@ const io = require("socket.io-client");
 // Chrome --> webkitGetUserMedia
 // Firefox --> mozGetUserMedia
 navigator.getUserMedia =
-	navigator.getUserMedia ||
-	navigator.webkitGetUserMedia ||
-	navigator.mozGetUserMedia;
+	navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia;
 
 var isSendBye = false;
 // Clean-up function:
@@ -88,9 +86,15 @@ var pc_constraints = {
 var sdpConstraints = {};
 
 // Let's get started: prompt user for input (room name)
-// var room = prompt("Enter room name:");
+var url = window.location.href;
+var index = url.indexOf("#");
+var room,
+	isHasRoom = false;
+if (index != -1) {
+	room = url.substring(index + 1);
+	isHasRoom = true;
+}
 
-// var name = prompt("Enter your name:");
 // Connect to signaling server
 var socket = io("https://webrtc-demo-server.onrender.com/", {
 	transports: ["websocket"],
@@ -102,6 +106,11 @@ const yourNameTxt = document.getElementById("yourName");
 const joinBtn = document.getElementById("joinBtn");
 const streamDiv = document.getElementById("streamDiv");
 const homeDiv = document.getElementById("homeDiv");
+const endCallBtn = document.getElementById("callBtn");
+
+if (room) {
+	roomNameTxt.value = room;
+}
 
 roomNameTxt.addEventListener("input", (e) => {
 	if (roomNameTxt.value !== "" && yourNameTxt.value !== "") {
@@ -134,14 +143,22 @@ joinBtn.addEventListener("click", (e) => {
 	homeDiv.style.display = "none";
 	// Send 'Create or join' message to singnaling server
 	if (roomNameTxt.value !== "") {
+		console.log(window.location.origin);
+		if (!room) {
+			location.href = document.URL + "#" + roomNameTxt.value;
+		}
 		console.log("Create or join room", roomNameTxt.value);
 		socket.emit("create or join", roomNameTxt.value);
 	}
 });
-
-// var socket = io("http://localhost:8181", {
-//   transports: ["websocket"],
-// });
+endCallBtn.addEventListener("click", (e) => {
+	streamDiv.style.display = "none";
+	homeDiv.style.display = "flex";
+	roomNameTxt.value = null;
+	yourNameTxt.value = null;
+	joinBtn.disabled = true;
+	location.href = document.URL.split("#")[0];
+});
 
 // Set getUserMedia constraints
 var constraints = { video: true, audio: true };
@@ -159,6 +176,12 @@ function handleUserMedia(stream) {
 		}
 	} else {
 		localVideo.src = stream;
+	}
+	if (localStream.getVideoTracks().length <= 0) {
+		cameraOffBtn.style.display = "block";
+		cameraOnBtn.style.display = "none";
+		cameraBtn.style.backgroundColor = "red";
+		cameraBtn.title = "Turn on camera";
 	}
 	console.log("Adding local stream.");
 	sendMessage("got user media");
@@ -229,12 +252,7 @@ socket.on("message", function (message) {
 		// }
 		isStarted = true;
 		if (!message.isSendAll) {
-			var newPeer = createPeerConnection(
-				listPc.length,
-				message.name,
-				false,
-				message.destinationId
-			);
+			var newPeer = createPeerConnection(listPc.length, message.name, false, message.destinationId);
 			listPc.push({
 				pc: newPeer,
 				destinationId: message.destinationId,
@@ -245,9 +263,7 @@ socket.on("message", function (message) {
 		} else {
 			listPc.map((item) => {
 				if (item.destinationId == message.sourceId) {
-					item.pc.setRemoteDescription(
-						new RTCSessionDescription(message.message)
-					);
+					item.pc.setRemoteDescription(new RTCSessionDescription(message.message));
 					doAnswer(item.pc, message.index, message.destinationId);
 				}
 			});
@@ -256,9 +272,7 @@ socket.on("message", function (message) {
 		console.log(message);
 		listPc.map((item) => {
 			if (item.destinationId === message.sourceId) {
-				item.pc.setRemoteDescription(
-					new RTCSessionDescription(message.message)
-				);
+				item.pc.setRemoteDescription(new RTCSessionDescription(message.message));
 			}
 		});
 	} else if (message.message.type === "candidate" && isStarted) {
@@ -278,12 +292,7 @@ socket.on("message", function (message) {
 });
 // 2. Client-->Server
 // Send message to the other peer via the signaling server
-function sendMessage(
-	message,
-	index = -1,
-	destinationId = null,
-	isSendAll = false
-) {
+function sendMessage(message, index = -1, destinationId = null, isSendAll = false) {
 	console.log("Sending message: ", {
 		message,
 		room: roomNameTxt.value,
@@ -306,12 +315,7 @@ function sendMessage(
 function checkAndStart(destinationId, name) {
 	if (typeof localStream != "undefined") {
 		console.log(isInitiator);
-		var newPeer = createPeerConnection(
-			listPc.length,
-			name,
-			true,
-			destinationId
-		);
+		var newPeer = createPeerConnection(listPc.length, name, true, destinationId);
 		listPc.push({
 			pc: newPeer,
 			destinationId: destinationId,
@@ -323,12 +327,7 @@ function checkAndStart(destinationId, name) {
 	}
 }
 // PeerConnection management...
-function createPeerConnection(
-	index,
-	name,
-	isFromOffer = false,
-	destinationId = null
-) {
+function createPeerConnection(index, name, isFromOffer = false, destinationId = null) {
 	try {
 		var peerConnection = new RTCPeerConnection(pc_config, pc_constraints);
 		if (!localVideo.hidden) {
@@ -352,20 +351,16 @@ function createPeerConnection(
 		alert("Cannot create RTCPeerConnection object.");
 		return;
 	}
-	peerConnection.onaddstream = (event) =>
-		handleRemoteStreamAdded(event, index, name);
+	peerConnection.onaddstream = (event) => handleRemoteStreamAdded(event, index, name);
 	peerConnection.onremovestream = handleRemoteStreamRemoved;
 	peerConnection.oniceconnectionstatechange = () =>
 		handleConnectionStateChange(peerConnection, destinationId);
 	if (isFromOffer) {
 		try {
 			// Create a reliable data channel
-			var newSendChannel = peerConnection.createDataChannel(
-				"sendDataChannel" + index,
-				{
-					reliable: true,
-				}
-			);
+			var newSendChannel = peerConnection.createDataChannel("sendDataChannel" + index, {
+				reliable: true,
+			});
 			console.log("Created send data channel");
 		} catch (e) {
 			alert("Failed to create data channel. ");
@@ -399,13 +394,7 @@ function replaceURLs(message) {
 		if (!hyperlink.match("^https?://")) {
 			hyperlink = "http://" + hyperlink;
 		}
-		return (
-			'<a href="' +
-			hyperlink +
-			'" target="_blank" rel="noopener noreferrer">' +
-			url +
-			"</a>"
-		);
+		return '<a href="' + hyperlink + '" target="_blank" rel="noopener noreferrer">' + url + "</a>";
 	});
 }
 // Data channel management
@@ -443,10 +432,8 @@ function gotReceiveChannel(event) {
 	console.log(event);
 	var newReceiveChannel = event.channel;
 	newReceiveChannel.onmessage = handleMessage;
-	newReceiveChannel.onopen = () =>
-		handleReceiveChannelStateChange(newReceiveChannel);
-	newReceiveChannel.onclose = () =>
-		handleReceiveChannelStateChange(newReceiveChannel);
+	newReceiveChannel.onopen = () => handleReceiveChannelStateChange(newReceiveChannel);
+	newReceiveChannel.onclose = () => handleReceiveChannelStateChange(newReceiveChannel);
 	listRecieveChannel.push(newReceiveChannel);
 }
 function handleMessage(event) {
@@ -503,12 +490,7 @@ function doCall(peerConnection, destinationId) {
 	console.log("Creating Offer...");
 	peerConnection.createOffer(
 		(sessionDescription) =>
-			setLocalAndSendMessage(
-				sessionDescription,
-				peerConnection,
-				listPc.length - 1,
-				destinationId
-			),
+			setLocalAndSendMessage(sessionDescription, peerConnection, listPc.length - 1, destinationId),
 		onSignalingError,
 		sdpConstraints
 	);
@@ -522,12 +504,7 @@ function doAnswer(peerConnection, index, destinationId) {
 	console.log("Sending answer to peer.");
 	peerConnection.createAnswer(
 		(sessionDescription) =>
-			setLocalAndSendMessage(
-				sessionDescription,
-				peerConnection,
-				index,
-				destinationId
-			),
+			setLocalAndSendMessage(sessionDescription, peerConnection, index, destinationId),
 		onSignalingError,
 		sdpConstraints
 	);
@@ -562,8 +539,7 @@ function handleRemoteStreamAdded(event, index, name) {
 
 		var divOverlay = document.createElement("div");
 		divOverlay.setAttribute("class", "overlay");
-		divOverlay.style.cssText +=
-			"position: absolute; top: 0px; margin-left: 20px; z-index:1; color: white; font-size: 24px;";
+		divOverlay.className += " textOverlay";
 		divOverlay.appendChild(nameTag);
 
 		divTag.appendChild(divOverlay);
@@ -572,11 +548,7 @@ function handleRemoteStreamAdded(event, index, name) {
 		video.setAttribute("id", "video" + index);
 		video.muted = false;
 		video.autoplay = true;
-		video.style.cssText += "position: relative; z-index: 0;";
-		video.setAttribute(
-			"poster",
-			"https://i.postimg.cc/j5kb1NB4/Unknown-person.jpg"
-		);
+		video.setAttribute("poster", "https://i.postimg.cc/j5kb1NB4/Unknown-person.jpg");
 
 		outer = document.createElement("div");
 		outer.setAttribute("class", "outer");
@@ -737,23 +709,9 @@ async function loadBodyPix() {
 }
 
 async function perform(net) {
-	while (
-		selectedLibrary === "bodypix" &&
-		(blurredEnabled || virtualBackgroundEnabled)
-	) {
-		segmentationMaskCtx.clearRect(
-			0,
-			0,
-			canvasOutput.width,
-			canvasOutput.height
-		);
-		segmentationMaskCtx.drawImage(
-			localVideo,
-			0,
-			0,
-			canvasOutput.width,
-			canvasOutput.height
-		);
+	while (selectedLibrary === "bodypix" && (blurredEnabled || virtualBackgroundEnabled)) {
+		segmentationMaskCtx.clearRect(0, 0, canvasOutput.width, canvasOutput.height);
+		segmentationMaskCtx.drawImage(localVideo, 0, 0, canvasOutput.width, canvasOutput.height);
 
 		const segmentation = await net.segmentPerson(segmentationMaskCanvas);
 		for (let i = 0; i < segmentationPixelCount; i++) {
@@ -762,11 +720,7 @@ async function perform(net) {
 		}
 		segmentationMaskCtx.putImageData(segmentationMask, 0, 0);
 
-		runPostProcessing(
-			localVideo,
-			segmentationMaskCanvas,
-			backgroundBlurRange.value
-		);
+		runPostProcessing(localVideo, segmentationMaskCanvas, backgroundBlurRange.value);
 	}
 }
 //#endregion
@@ -852,13 +806,7 @@ async function onLibraryUnload(library) {
 		item.pc.addStream(stream);
 		item.pc.createOffer(
 			(sessionDescription) =>
-				setLocalAndSendMessage(
-					sessionDescription,
-					item.pc,
-					index,
-					item.destinationId,
-					true
-				),
+				setLocalAndSendMessage(sessionDescription, item.pc, index, item.destinationId, true),
 			onSignalingError,
 			sdpConstraints
 		);
@@ -876,13 +824,7 @@ function setResultStream() {
 		item.pc.addStream(stream);
 		item.pc.createOffer(
 			(sessionDescription) =>
-				setLocalAndSendMessage(
-					sessionDescription,
-					item.pc,
-					index,
-					item.destinationId,
-					true
-				),
+				setLocalAndSendMessage(sessionDescription, item.pc, index, item.destinationId, true),
 			onSignalingError,
 			sdpConstraints
 		);
@@ -896,10 +838,6 @@ noBackgroundBtn.addEventListener("click", (e) => {
 	virtualBackgroundEnabled = false;
 	backgroundBlurRange.disabled = true;
 	edgeBlurRange.disabled = true;
-
-	noBackgroundBtn.classList.add("selected");
-	blurBackgroundBtn.classList.remove("selected");
-	virutalBackgroundBtn.classList.remove("selected");
 
 	if (!libraryLoaded) {
 		onLibraryLoad("none");
@@ -918,10 +856,6 @@ blurBackgroundBtn.addEventListener("click", (e) => {
 	} else {
 		edgeBlurRange.disabled = true;
 	}
-
-	noBackgroundBtn.classList.remove("selected");
-	blurBackgroundBtn.classList.add("selected");
-	virutalBackgroundBtn.classList.remove("selected");
 
 	if (!libraryLoaded) {
 		console.log(1);
@@ -942,10 +876,6 @@ virutalBackgroundBtn.addEventListener("click", (e) => {
 		edgeBlurRange.disabled = true;
 	}
 
-	noBackgroundBtn.classList.remove("selected");
-	blurBackgroundBtn.classList.remove("selected");
-	virutalBackgroundBtn.classList.add("selected");
-
 	selectedBackground = document.getElementById("virtualImage");
 
 	if (!libraryLoaded) {
@@ -958,8 +888,7 @@ virutalBackgroundBtn.addEventListener("click", (e) => {
 
 microBtn.addEventListener("click", (e) => {
 	if (localStream && localStream.getAudioTracks().length > 0) {
-		localStream.getAudioTracks()[0].enabled =
-			!localStream.getAudioTracks()[0].enabled;
+		localStream.getAudioTracks()[0].enabled = !localStream.getAudioTracks()[0].enabled;
 		if (localStream.getAudioTracks()[0].enabled) {
 			muteBtn.style.display = "none";
 			unmuteBtn.style.display = "block";
@@ -981,8 +910,7 @@ microBtn.addEventListener("click", (e) => {
 
 cameraBtn.addEventListener("click", (e) => {
 	if (localStream && localStream.getVideoTracks().length > 0) {
-		localStream.getVideoTracks()[0].enabled =
-			!localStream.getVideoTracks()[0].enabled;
+		localStream.getVideoTracks()[0].enabled = !localStream.getVideoTracks()[0].enabled;
 		cameraBtn.classList.toggle("turned-off");
 		if (localStream.getVideoTracks()[0].enabled) {
 			cameraOffBtn.style.display = "none";
