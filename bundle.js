@@ -30,6 +30,13 @@ var localVideo = document.querySelector("#localVideo");
 var remoteVideo = document.querySelector("#remoteVideo");
 // Handler associated with Send button
 sendButton.onclick = sendData;
+sendTextarea.addEventListener("keypress", function (event) {
+	if (event.key === "Enter") {
+		event.preventDefault();
+		sendData();
+	}
+});
+
 // Flags...
 var isChannelReady = false;
 var isInitiator = false;
@@ -107,6 +114,18 @@ yourNameTxt.addEventListener("input", (e) => {
 		joinBtn.disabled = false;
 	} else {
 		joinBtn.disabled = true;
+	}
+});
+yourNameTxt.addEventListener("keypress", function (event) {
+	if (event.key === "Enter") {
+		event.preventDefault();
+		streamDiv.style.display = "block";
+		homeDiv.style.display = "none";
+		// Send "Create or join" message to singnaling server
+		if (roomNameTxt.value !== "") {
+			console.log("Create or join room", roomNameTxt.value);
+			socket.emit("create or join", roomNameTxt.value);
+		}
 	}
 });
 joinBtn.addEventListener("click", (e) => {
@@ -365,8 +384,8 @@ function sendData() {
 
 	newMessage = document.createElement("p");
 	newMessage.innerHTML = replaceURLs("You: " + data.message);
-	newMessage.style.width = "100%";
 	newMessage.style.wordWrap = "break-word";
+	newMessage.className = "myMessage";
 	receiveTextarea.appendChild(newMessage);
 
 	data = JSON.stringify(data);
@@ -399,6 +418,7 @@ function handleMessage(event) {
 	newMessage = document.createElement("p");
 	newMessage.innerHTML = replaceURLs(data.name + ": " + data.message);
 	newMessage.style.wordWrap = "break-word";
+    newMessage.className = "guestMessage";
 	receiveTextarea.appendChild(newMessage);
 }
 function handleSendChannelStateChange(sendDataChannel) {
@@ -488,8 +508,7 @@ function handleRemoteStreamAdded(event, index, name) {
 		var divTag = document.createElement("div");
 		divTag.setAttribute("id", "div" + index);
 		divTag.setAttribute("class", "videoContainer");
-		divTag.style.cssText +=
-			"position: relative; width: 320px; display: inline-block; margin: 10px;";
+        divTag.setAttribute("class", "xyz");
 
 		var nameTag = document.createElement("p");
 		nameTag.innerHTML = name;
@@ -505,17 +524,39 @@ function handleRemoteStreamAdded(event, index, name) {
 		video = document.createElement("video");
 		video.setAttribute("id", "video" + index);
 		video.muted = false;
-		video.height = 240; // in px
-		video.width = 320; // in px
 		video.autoplay = true;
 		video.style.cssText += "position: relative; z-index: 0;";
 		video.setAttribute("poster", "https://i.postimg.cc/j5kb1NB4/Unknown-person.jpg");
 
-		divTag.appendChild(video);
+		outer = document.createElement("div");
+		outer.setAttribute("class", "outer");
+        outer.appendChild(video);
 
-		const td = document.getElementById("remoteContainer");
+		divTag.appendChild(outer);
+        divTag.childNodes[1].className += " full";
+        divTag.childNodes[1].childNodes[0].className += " full";
+
+        const td = document.getElementById("remoteContainer");
 		td.appendChild(divTag);
-	}
+
+        var len = td.childNodes.length
+        if (len == 1) {
+            for (let i = 0; i < len; i++) {
+                td.childNodes[i].className = "two"
+            }
+        } else if (len > 4) {
+            for (let i = 0; i < len; i++) {
+                td.childNodes[i].className = "nine"
+                if ((len ==5 && i >2) || (len ==8&&i>5)) {
+                    td.childNodes[i].className = "four"
+                }
+            }
+        } else {
+            for (let i = 0; i < len; i++) {
+                td.childNodes[i].className = "four"
+            }
+        }
+    }
 
 	//attachMediaStream(remoteVideo, event.stream);
 	if (window.URL) {
@@ -846,6 +887,7 @@ cameraBtn.addEventListener("click", (e) => {
 		if (localStream.getVideoTracks()[0].enabled) {
 			cameraOffBtn.style.display = "none";
 			cameraOnBtn.style.display = "block";
+			cameraBtn.style.backgroundColor = "#3C4043";
 			cameraBtn.title = "Turn off camera";
 		} else {
 			cameraOffBtn.style.display = "block";
