@@ -563,7 +563,7 @@ function handleRemoteStreamAdded(event, index, name) {
 		var divOverlay = document.createElement("div");
 		divOverlay.setAttribute("class", "overlay");
 		divOverlay.style.cssText +=
-			"position: absolute; bottom: 0; left: 10px; z-index:1; color: white; font-size: 24px;";
+			"position: absolute; top: 0px; margin-left: 20px; z-index:1; color: white; font-size: 24px;";
 		divOverlay.appendChild(nameTag);
 
 		divTag.appendChild(divOverlay);
