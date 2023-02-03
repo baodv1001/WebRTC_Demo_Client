@@ -8,17 +8,19 @@ const io = require("socket.io-client");
 // Chrome --> webkitGetUserMedia
 // Firefox --> mozGetUserMedia
 navigator.getUserMedia =
-	navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia;
+  navigator.getUserMedia ||
+  navigator.webkitGetUserMedia ||
+  navigator.mozGetUserMedia;
 
 var isSendBye = false;
 // Clean-up function:
 // collect garbage before unloading browser's window
 window.onbeforeunload = function (e) {
-	e.preventDefault();
-	hangup();
-	if (!isSendBye) {
-		return "Are you sure you want to leave the call?";
-	}
+  e.preventDefault();
+  hangup();
+  if (!isSendBye) {
+    return "Are you sure you want to leave the call?";
+  }
 };
 // Data channel information
 // var sendChannel, receiveChannel;
@@ -30,6 +32,13 @@ var localVideo = document.querySelector("#localVideo");
 var remoteVideo = document.querySelector("#remoteVideo");
 // Handler associated with Send button
 sendButton.onclick = sendData;
+sendTextarea.addEventListener("keypress", function (event) {
+  if (event.key === "Enter") {
+    event.preventDefault();
+    sendData();
+  }
+});
+
 // Flags...
 var isChannelReady = false;
 var isInitiator = false;
@@ -47,45 +56,51 @@ var originalStream;
 
 // PeerConnection ICE protocol configuration (either Firefox or Chrome)
 var pc_config = {
-	iceServers: [
-		{
-			urls: "stun:relay.metered.ca:80",
-		},
-		{
-			urls: "turn:relay.metered.ca:80",
-			username: "7d7c879c5731bf89a95eca58",
-			credential: "4yNvRI75cj/sQTNV",
-		},
-		{
-			urls: "turn:relay.metered.ca:443",
-			username: "7d7c879c5731bf89a95eca58",
-			credential: "4yNvRI75cj/sQTNV",
-		},
-		{
-			urls: "turn:relay.metered.ca:443?transport=tcp",
-			username: "7d7c879c5731bf89a95eca58",
-			credential: "4yNvRI75cj/sQTNV",
-		},
-		{
-			urls: "turn:numb.viagenie.ca",
-			credential: "muazkh",
-			username: "webrtc@live.com",
-		},
-	],
+  iceServers: [
+    {
+      urls: "stun:relay.metered.ca:80",
+    },
+    {
+      urls: "turn:relay.metered.ca:80",
+      username: "7d7c879c5731bf89a95eca58",
+      credential: "4yNvRI75cj/sQTNV",
+    },
+    {
+      urls: "turn:relay.metered.ca:443",
+      username: "7d7c879c5731bf89a95eca58",
+      credential: "4yNvRI75cj/sQTNV",
+    },
+    {
+      urls: "turn:relay.metered.ca:443?transport=tcp",
+      username: "7d7c879c5731bf89a95eca58",
+      credential: "4yNvRI75cj/sQTNV",
+    },
+    {
+      urls: "turn:numb.viagenie.ca",
+      credential: "muazkh",
+      username: "webrtc@live.com",
+    },
+  ],
 };
 
 var pc_constraints = {
-	optional: [{ DtlsSrtpKeyAgreement: true }],
+  optional: [{ DtlsSrtpKeyAgreement: true }],
 };
 var sdpConstraints = {};
 
 // Let's get started: prompt user for input (room name)
-// var room = prompt("Enter room name:");
+var url = window.location.href;
+var index = url.indexOf("#");
+var room,
+  isHasRoom = false;
+if (index != -1) {
+  room = url.substring(index + 1);
+  isHasRoom = true;
+}
 
-// var name = prompt("Enter your name:");
 // Connect to signaling server
 var socket = io("https://webrtc-demo-server.onrender.com/", {
-	transports: ["websocket"],
+  transports: ["websocket"],
 });
 
 //page home (enter your name, room name)
@@ -94,484 +109,647 @@ const yourNameTxt = document.getElementById("yourName");
 const joinBtn = document.getElementById("joinBtn");
 const streamDiv = document.getElementById("streamDiv");
 const homeDiv = document.getElementById("homeDiv");
+const endCallBtn = document.getElementById("callBtn");
+
+if (room) {
+  roomNameTxt.value = room;
+}
 
 roomNameTxt.addEventListener("input", (e) => {
-	if (roomNameTxt.value !== "" && yourNameTxt.value !== "") {
-		joinBtn.disabled = false;
-	} else {
-		joinBtn.disabled = true;
-	}
+  if (roomNameTxt.value !== "" && yourNameTxt.value !== "") {
+    joinBtn.disabled = false;
+  } else {
+    joinBtn.disabled = true;
+  }
 });
 yourNameTxt.addEventListener("input", (e) => {
-	if (roomNameTxt.value !== "" && yourNameTxt.value !== "") {
-		joinBtn.disabled = false;
-	} else {
-		joinBtn.disabled = true;
-	}
+  if (roomNameTxt.value !== "" && yourNameTxt.value !== "") {
+    joinBtn.disabled = false;
+  } else {
+    joinBtn.disabled = true;
+  }
+});
+yourNameTxt.addEventListener("keypress", function (event) {
+  if (event.key === "Enter") {
+    event.preventDefault();
+    streamDiv.style.display = "block";
+    homeDiv.style.display = "none";
+    // Send "Create or join" message to singnaling server
+    if (roomNameTxt.value !== "") {
+      console.log("Create or join room", roomNameTxt.value);
+      socket.emit("create or join", roomNameTxt.value);
+    }
+  }
 });
 joinBtn.addEventListener("click", (e) => {
-	streamDiv.style.display = "block";
-	homeDiv.style.display = "none";
-	// Send 'Create or join' message to singnaling server
-	if (roomNameTxt.value !== "") {
-		console.log("Create or join room", roomNameTxt.value);
-		socket.emit("create or join", roomNameTxt.value);
-	}
+  streamDiv.style.display = "block";
+  homeDiv.style.display = "none";
+  // Send 'Create or join' message to singnaling server
+  if (roomNameTxt.value !== "") {
+    console.log(window.location.origin);
+    if (!room) {
+      location.href = document.URL + "#" + roomNameTxt.value;
+    }
+    console.log("Create or join room", roomNameTxt.value);
+    socket.emit("create or join", roomNameTxt.value);
+  }
 });
-
-// var socket = io("http://localhost:8181", {
-//   transports: ["websocket"],
-// });
+endCallBtn.addEventListener("click", (e) => {
+  streamDiv.style.display = "none";
+  homeDiv.style.display = "flex";
+  roomNameTxt.value = null;
+  yourNameTxt.value = null;
+  joinBtn.disabled = true;
+  location.href = document.URL.split("#")[0];
+});
 
 // Set getUserMedia constraints
 var constraints = { video: true, audio: true };
 // From this point on, execution proceeds based on asynchronous events...
 // getUserMedia() handlers...
 function handleUserMedia(stream) {
-	localStream = stream;
-	originalStream = stream;
-	//attachMediaStream(localVideo, stream);
-	if (window.URL) {
-		if ("srcObject" in localVideo) {
-			localVideo.srcObject = stream;
-		} else {
-			localVideo.src = window.URL.createObjectURL(stream);
-		}
-	} else {
-		localVideo.src = stream;
-	}
-	console.log("Adding local stream.");
-	sendMessage("got user media");
+  localStream = stream;
+  originalStream = stream;
+  //attachMediaStream(localVideo, stream);
+  if (window.URL) {
+    if ("srcObject" in localVideo) {
+      localVideo.srcObject = stream;
+    } else {
+      localVideo.src = window.URL.createObjectURL(stream);
+    }
+  } else {
+    localVideo.src = stream;
+  }
+  if (localStream.getVideoTracks().length <= 0) {
+    cameraOffBtn.style.display = "block";
+    cameraOnBtn.style.display = "none";
+    cameraBtn.style.backgroundColor = "red";
+    cameraBtn.title = "Turn on camera";
+  }
+  console.log("Adding local stream.");
+  sendMessage("got user media");
 }
 function handleUserMediaError(error) {
-	console.log("navigator.getUserMedia error: ", error);
+  console.log("navigator.getUserMedia error: ", error);
 }
 // Server-mediated message exchanging...
 // 1. Server-->Client...
 // Handle 'created' message coming back from server:
 // this peer is the initiator
 socket.on("created", function (room) {
-	console.log("Created room " + room);
-	isInitiator = true;
-	// Call getUserMedia()
-	navigator.mediaDevices.enumerateDevices().then((devices) => {
-		const cams = devices.filter((device) => device.kind == "videoinput");
-		const mics = devices.filter((device) => device.kind == "audioinput");
+  console.log("Created room " + room);
+  isInitiator = true;
+  // Call getUserMedia()
+  //   navigator.mediaDevices.enumerateDevices().then((devices) => {
+  //     const cams = devices.filter((device) => device.kind == "videoinput");
+  //     const mics = devices.filter((device) => device.kind == "audioinput");
 
-		const constraints = { video: cams.length > 0, audio: mics.length > 0 };
-		navigator.getUserMedia(constraints, handleUserMedia, handleUserMediaError);
-		console.log("Getting user media with constraints", constraints);
-	});
-	//navigator.getUserMedia(constraints, handleUserMedia, handleUserMediaError);
-	checkAndStart();
+  //     console.log("cams", cams);
+  //     console.log("mics", mics);
+
+  //     const constraints = { video: cams.length > 0, audio: mics.length > 0 };
+  //     navigator.getUserMedia(constraints, handleUserMedia, handleUserMediaError);
+  //     console.log("Getting user media with constraints", constraints);
+  //   });
+
+  navigator.permissions.query({ name: "camera" }).then((result) => {
+    var isCameraAccess = result.state == "granted" || result.state == "prompt";
+    console.log(result.state);
+    navigator.permissions.query({ name: "microphone" }).then((result) => {
+      var isMicAccess = result.state == "prompt" || result.state == "granted";
+      console.log(result.state);
+
+      const constraints = { video: isCameraAccess, audio: isMicAccess };
+      if (isCameraAccess == false && isMicAccess == false) {
+        alert("Please allow camera and microphone access to use this app");
+      } else {
+        navigator.getUserMedia(
+          constraints,
+          handleUserMedia,
+          handleUserMediaError
+        );
+      }
+      console.log("Getting user media with constraints", constraints);
+    });
+  });
+  checkAndStart();
 });
 // Handle 'full' message coming back from server:
 // this peer arrived too late :-(
 socket.on("full", function (room) {
-	console.log("Room " + room + " is full");
+  console.log("Room " + room + " is full");
 });
 // Handle 'join' message coming back from server:
 // another peer is joining the channel
 socket.on("join", function (room) {
-	console.log("Another peer made a request to join room " + room);
-	console.log("This peer is the initiator of room " + room + "!");
-	isChannelReady = true;
+  console.log("Another peer made a request to join room " + room);
+  console.log("This peer is the initiator of room " + room + "!");
+  isChannelReady = true;
 });
 // Handle 'joined' message coming back from server:
 // this is the second peer joining the channel
 socket.on("joined", function (numClient) {
-	console.log("This peer has joined room " + numClient);
-	numClients = numClient;
-	isChannelReady = true;
-	// Call getUserMedia()
-	navigator.mediaDevices.enumerateDevices().then((devices) => {
-		const cams = devices.filter((device) => device.kind == "videoinput");
-		const mics = devices.filter((device) => device.kind == "audioinput");
+  console.log("This peer has joined room " + numClient);
+  numClients = numClient;
+  isChannelReady = true;
+  // Call getUserMedia()
+  //   navigator.mediaDevices.enumerateDevices().then((devices) => {
+  //     const cams = devices.filter((device) => device.kind == "videoinput");
+  //     const mics = devices.filter((device) => device.kind == "audioinput");
 
-		const constraints = { video: cams.length > 0, audio: mics.length > 0 };
-		navigator.getUserMedia(constraints, handleUserMedia, handleUserMediaError);
-		console.log("Getting user media with constraints", constraints);
-	});
-	//navigator.getUserMedia(constraints, handleUserMedia, handleUserMediaError);
+  //     const constraints = { video: cams.length > 0, audio: mics.length > 0 };
+  //     navigator.getUserMedia(constraints, handleUserMedia, handleUserMediaError);
+  //     console.log("Getting user media with constraints", constraints);
+  //   });
+
+  navigator.permissions.query({ name: "camera" }).then((result) => {
+    var isCameraAccess = result.state == "granted" || result.state == "prompt";
+    console.log(result.state);
+    navigator.permissions.query({ name: "microphone" }).then((result) => {
+      var isMicAccess = result.state == "prompt" || result.state == "granted";
+      console.log(result.state);
+
+      const constraints = { video: isCameraAccess, audio: isMicAccess };
+      if (isCameraAccess == false && isMicAccess == false) {
+        alert("Please allow camera and microphone access to use this app");
+      } else {
+        navigator.getUserMedia(
+          constraints,
+          handleUserMedia,
+          handleUserMediaError
+        );
+      }
+      console.log("Getting user media with constraints", constraints);
+    });
+  });
+
+  //navigator.getUserMedia(constraints, handleUserMedia, handleUserMediaError);
 });
 // Server-sent log message...
 socket.on("log", function (array) {
-	console.log.apply(console, array);
+  console.log.apply(console, array);
 });
 // Receive message from the other peer via the signaling server
 socket.on("message", function (message) {
-	console.log("Received message:", message);
-	if (message.message === "got user media") {
-		checkAndStart(message.destinationId, message.name);
-	} else if (message.message.type === "offer") {
-		// if (!isInitiator && !isStarted) {
-		//   checkAndStart();
-		// }
-		isStarted = true;
-		if (!message.isSendAll) {
-			var newPeer = createPeerConnection(listPc.length, message.name, false, message.destinationId);
-			listPc.push({
-				pc: newPeer,
-				destinationId: message.destinationId,
-				sourceId: socket.id,
-			});
-			newPeer.setRemoteDescription(new RTCSessionDescription(message.message));
-			doAnswer(newPeer, message.index, message.destinationId);
-		} else {
-			listPc.map((item) => {
-				if (item.destinationId == message.sourceId) {
-					item.pc.setRemoteDescription(new RTCSessionDescription(message.message));
-					doAnswer(item.pc, message.index, message.destinationId);
-				}
-			});
-		}
-	} else if (message.message.type === "answer" && isStarted) {
-		console.log(message);
-		listPc.map((item) => {
-			if (item.destinationId === message.sourceId) {
-				item.pc.setRemoteDescription(new RTCSessionDescription(message.message));
-			}
-		});
-	} else if (message.message.type === "candidate" && isStarted) {
-		var candidate = new RTCIceCandidate({
-			sdpMLineIndex: message.message.label,
-			candidate: message.message.candidate,
-		});
-		listPc.map((item) => {
-			if (item.pc && item.pc.remoteDescription) {
-				item.pc.addIceCandidate(candidate);
-			}
-		});
-		// pc.addIceCandidate(candidate);
-	} else if (message.message === "bye") {
-		handleRemoteHangup(message.sourceId);
-	}
+  console.log("Received message:", message);
+  if (message.message === "got user media") {
+    checkAndStart(message.destinationId, message.name);
+  } else if (message.message.type === "offer") {
+    // if (!isInitiator && !isStarted) {
+    //   checkAndStart();
+    // }
+    isStarted = true;
+    if (!message.isSendAll) {
+      var newPeer = createPeerConnection(
+        listPc.length,
+        message.name,
+        false,
+        message.destinationId
+      );
+      listPc.push({
+        pc: newPeer,
+        destinationId: message.destinationId,
+        sourceId: socket.id,
+      });
+      newPeer.setRemoteDescription(new RTCSessionDescription(message.message));
+      doAnswer(newPeer, message.index, message.destinationId);
+    } else {
+      listPc.map((item) => {
+        if (item.destinationId == message.sourceId) {
+          item.pc.setRemoteDescription(
+            new RTCSessionDescription(message.message)
+          );
+          doAnswer(item.pc, message.index, message.destinationId);
+        }
+      });
+    }
+  } else if (message.message.type === "answer" && isStarted) {
+    console.log(message);
+    listPc.map((item) => {
+      if (item.destinationId === message.sourceId) {
+        item.pc.setRemoteDescription(
+          new RTCSessionDescription(message.message)
+        );
+      }
+    });
+  } else if (message.message.type === "candidate" && isStarted) {
+    var candidate = new RTCIceCandidate({
+      sdpMLineIndex: message.message.label,
+      candidate: message.message.candidate,
+    });
+    listPc.map((item) => {
+      if (item.pc && item.pc.remoteDescription) {
+        item.pc.addIceCandidate(candidate);
+      }
+    });
+    // pc.addIceCandidate(candidate);
+  } else if (message.message === "bye") {
+    handleRemoteHangup(message.sourceId);
+  }
 });
 // 2. Client-->Server
 // Send message to the other peer via the signaling server
-function sendMessage(message, index = -1, destinationId = null, isSendAll = false) {
-	console.log("Sending message: ", {
-		message,
-		room: roomNameTxt.value,
-		index,
-		sourceId: socket.id,
-		destinationId: destinationId,
-		isSendAll: isSendAll,
-	});
-	socket.emit("message", {
-		name: yourNameTxt.value,
-		message: message,
-		room: roomNameTxt.value,
-		index: index,
-		sourceId: socket.id,
-		destinationId: destinationId,
-		isSendAll: isSendAll,
-	});
+function sendMessage(
+  message,
+  index = -1,
+  destinationId = null,
+  isSendAll = false
+) {
+  console.log("Sending message: ", {
+    message,
+    room: roomNameTxt.value,
+    index,
+    sourceId: socket.id,
+    destinationId: destinationId,
+    isSendAll: isSendAll,
+  });
+  socket.emit("message", {
+    name: yourNameTxt.value,
+    message: message,
+    room: roomNameTxt.value,
+    index: index,
+    sourceId: socket.id,
+    destinationId: destinationId,
+    isSendAll: isSendAll,
+  });
 }
 // Channel negotiation trigger function
 function checkAndStart(destinationId, name) {
-	if (typeof localStream != "undefined") {
-		console.log(isInitiator);
-		var newPeer = createPeerConnection(listPc.length, name, true, destinationId);
-		listPc.push({
-			pc: newPeer,
-			destinationId: destinationId,
-			sourceId: socket.id,
-		});
-		isStarted = true;
+  if (typeof localStream != "undefined") {
+    console.log(isInitiator);
+    var newPeer = createPeerConnection(
+      listPc.length,
+      name,
+      true,
+      destinationId
+    );
+    listPc.push({
+      pc: newPeer,
+      destinationId: destinationId,
+      sourceId: socket.id,
+    });
+    isStarted = true;
 
-		doCall(newPeer, destinationId);
-	}
+    doCall(newPeer, destinationId);
+  }
 }
 // PeerConnection management...
-function createPeerConnection(index, name, isFromOffer = false, destinationId = null) {
-	try {
-		var peerConnection = new RTCPeerConnection(pc_config, pc_constraints);
-		if (!localVideo.hidden) {
-			peerConnection.addStream(localStream);
-		} else {
-			var canvasStream = canvasOutput.captureStream();
-			peerConnection.addStream(canvasStream);
-		}
-		peerConnection.onicecandidate = () => handleIceCandidate(event);
-		console.log(
-			"Created RTCPeerConnnection with:\n" +
-				" config: '" +
-				JSON.stringify(pc_config) +
-				"';\n" +
-				" constraints: '" +
-				JSON.stringify(pc_constraints) +
-				"'."
-		);
-	} catch (e) {
-		console.log("Failed to create PeerConnection, exception: " + e.message);
-		alert("Cannot create RTCPeerConnection object.");
-		return;
-	}
-	peerConnection.onaddstream = (event) => handleRemoteStreamAdded(event, index, name);
-	peerConnection.onremovestream = handleRemoteStreamRemoved;
-	peerConnection.oniceconnectionstatechange = () =>
-		handleConnectionStateChange(peerConnection, destinationId);
-	if (isFromOffer) {
-		try {
-			// Create a reliable data channel
-			var newSendChannel = peerConnection.createDataChannel("sendDataChannel" + index, {
-				reliable: true,
-			});
-			console.log("Created send data channel");
-		} catch (e) {
-			alert("Failed to create data channel. ");
-			console.log("createDataChannel() failed with exception: " + e.message);
-		}
-		newSendChannel.onopen = () => handleSendChannelStateChange(newSendChannel);
-		newSendChannel.onmessage = handleMessage;
-		newSendChannel.onclose = () => handleSendChannelStateChange(newSendChannel);
+function createPeerConnection(
+  index,
+  name,
+  isFromOffer = false,
+  destinationId = null
+) {
+  try {
+    var peerConnection = new RTCPeerConnection(pc_config, pc_constraints);
+    if (!localVideo.hidden) {
+      peerConnection.addStream(localStream);
+    } else {
+      var canvasStream = canvasOutput.captureStream();
+      peerConnection.addStream(canvasStream);
+    }
+    peerConnection.onicecandidate = () => handleIceCandidate(event);
+    console.log(
+      "Created RTCPeerConnnection with:\n" +
+        " config: '" +
+        JSON.stringify(pc_config) +
+        "';\n" +
+        " constraints: '" +
+        JSON.stringify(pc_constraints) +
+        "'."
+    );
+  } catch (e) {
+    console.log("Failed to create PeerConnection, exception: " + e.message);
+    alert("Cannot create RTCPeerConnection object.");
+    return;
+  }
+  peerConnection.onaddstream = (event) =>
+    handleRemoteStreamAdded(event, index, name);
+  peerConnection.onremovestream = handleRemoteStreamRemoved;
+  peerConnection.oniceconnectionstatechange = () =>
+    handleConnectionStateChange(peerConnection, destinationId);
+  if (isFromOffer) {
+    try {
+      // Create a reliable data channel
+      var newSendChannel = peerConnection.createDataChannel(
+        "sendDataChannel" + index,
+        {
+          reliable: true,
+        }
+      );
+      console.log("Created send data channel");
+    } catch (e) {
+      alert("Failed to create data channel. ");
+      console.log("createDataChannel() failed with exception: " + e.message);
+    }
+    newSendChannel.onopen = () => handleSendChannelStateChange(newSendChannel);
+    newSendChannel.onmessage = handleMessage;
+    newSendChannel.onclose = () => handleSendChannelStateChange(newSendChannel);
 
-		listSendDataChannel.push(newSendChannel);
-	} else {
-		// Joiner
-		peerConnection.ondatachannel = gotReceiveChannel;
-	}
+    listSendDataChannel.push(newSendChannel);
+  } else {
+    // Joiner
+    peerConnection.ondatachannel = gotReceiveChannel;
+  }
 
-	return peerConnection;
+  return peerConnection;
 }
 
 function handleConnectionStateChange(pc, destinationId) {
-	if (pc.iceConnectionState == "disconnected") {
-		handleRemoteHangup(destinationId);
-	}
+  if (pc.iceConnectionState == "disconnected") {
+    handleRemoteHangup(destinationId);
+  }
 }
 
 function replaceURLs(message) {
-	if (!message) return;
+  if (!message) return;
 
-	var urlRegex = /(((https?:\/\/)|(www\.))[^\s]+)/g;
-	return message.replace(urlRegex, function (url) {
-		var hyperlink = url;
-		if (!hyperlink.match("^https?://")) {
-			hyperlink = "http://" + hyperlink;
-		}
-		return '<a href="' + hyperlink + '" target="_blank" rel="noopener noreferrer">' + url + "</a>";
-	});
+  var urlRegex = /(((https?:\/\/)|(www\.))[^\s]+)/g;
+  return message.replace(urlRegex, function (url) {
+    var hyperlink = url;
+    if (!hyperlink.match("^https?://")) {
+      hyperlink = "http://" + hyperlink;
+    }
+    return (
+      '<a href="' +
+      hyperlink +
+      '" target="_blank" rel="noopener noreferrer">' +
+      url +
+      "</a>"
+    );
+  });
 }
 // Data channel management
 function sendData() {
-	var data = { message: sendTextarea.value, name: yourNameTxt.value };
-	// var data = sendTextarea.value;
-	// if (isInitiator) sendChannel.send(data);
-	// else receiveChannel.send(data);
+  var data = { message: sendTextarea.value, name: yourNameTxt.value };
+  // var data = sendTextarea.value;
+  // if (isInitiator) sendChannel.send(data);
+  // else receiveChannel.send(data);
 
-	console.log("send data");
+  console.log("send data");
 
-	newMessage = document.createElement("p");
-	newMessage.innerHTML = replaceURLs("You: " + data.message);
-	newMessage.style.width = "100%";
-	newMessage.style.wordWrap = "break-word";
-	receiveTextarea.appendChild(newMessage);
+  newMessage = document.createElement("p");
+  newMessage.innerHTML = replaceURLs("You: " + data.message);
+  newMessage.style.wordWrap = "break-word";
+  newMessage.className = "myMessage";
+  receiveTextarea.appendChild(newMessage);
 
-	data = JSON.stringify(data);
+  data = JSON.stringify(data);
 
-	listSendDataChannel.map((sendDataChannel) => {
-		sendDataChannel.send(data);
-	});
+  listSendDataChannel.map((sendDataChannel) => {
+    sendDataChannel.send(data);
+  });
 
-	listRecieveChannel.map((receiveDataChannel) => {
-		receiveDataChannel.send(data);
-	});
-	console.log("Sent data: " + data);
+  listRecieveChannel.map((receiveDataChannel) => {
+    receiveDataChannel.send(data);
+  });
+  console.log("Sent data: " + data);
 
-	sendTextarea.value = "";
-	sendButton.disabled = true;
+  sendTextarea.value = "";
+  sendButton.disabled = true;
 }
 // Handlers...
 function gotReceiveChannel(event) {
-	console.log("Receive Channel Callback");
-	console.log(event);
-	var newReceiveChannel = event.channel;
-	newReceiveChannel.onmessage = handleMessage;
-	newReceiveChannel.onopen = () => handleReceiveChannelStateChange(newReceiveChannel);
-	newReceiveChannel.onclose = () => handleReceiveChannelStateChange(newReceiveChannel);
-	listRecieveChannel.push(newReceiveChannel);
+  console.log("Receive Channel Callback");
+  console.log(event);
+  var newReceiveChannel = event.channel;
+  newReceiveChannel.onmessage = handleMessage;
+  newReceiveChannel.onopen = () =>
+    handleReceiveChannelStateChange(newReceiveChannel);
+  newReceiveChannel.onclose = () =>
+    handleReceiveChannelStateChange(newReceiveChannel);
+  listRecieveChannel.push(newReceiveChannel);
 }
 function handleMessage(event) {
-	console.log("Received message: " + event.data);
-	var data = JSON.parse(event.data);
-	newMessage = document.createElement("p");
-	newMessage.innerHTML = replaceURLs(data.name + ": " + data.message);
-	newMessage.style.wordWrap = "break-word";
-	receiveTextarea.appendChild(newMessage);
+  console.log("Received message: " + event.data);
+  var data = JSON.parse(event.data);
+  newMessage = document.createElement("p");
+  newMessage.innerHTML = replaceURLs(data.name + ": " + data.message);
+  newMessage.style.wordWrap = "break-word";
+  newMessage.className = "guestMessage";
+  receiveTextarea.appendChild(newMessage);
 }
 function handleSendChannelStateChange(sendDataChannel) {
-	var readyState = sendDataChannel.readyState;
-	console.log("Send channel state is: " + readyState);
-	// If channel ready, enable user's input
-	if (readyState == "open") {
-		dataChannelSend.disabled = false;
-		dataChannelSend.focus();
-		sendButton.disabled = false;
-	} else {
-		dataChannelSend.disabled = true;
-		sendButton.disabled = true;
-	}
+  var readyState = sendDataChannel.readyState;
+  console.log("Send channel state is: " + readyState);
+  // If channel ready, enable user's input
+  if (readyState == "open") {
+    dataChannelSend.disabled = false;
+    dataChannelSend.focus();
+    sendButton.disabled = false;
+  } else {
+    dataChannelSend.disabled = true;
+    sendButton.disabled = true;
+  }
 }
 function handleReceiveChannelStateChange(receiveChannel) {
-	var readyState = receiveChannel.readyState;
-	console.log("Receive channel state is: " + readyState);
-	// If channel ready, enable user's input
-	if (readyState == "open") {
-		dataChannelSend.disabled = false;
-		dataChannelSend.focus();
-		sendButton.disabled = false;
-	} else {
-		dataChannelSend.disabled = true;
-		sendButton.disabled = true;
-	}
+  var readyState = receiveChannel.readyState;
+  console.log("Receive channel state is: " + readyState);
+  // If channel ready, enable user's input
+  if (readyState == "open") {
+    dataChannelSend.disabled = false;
+    dataChannelSend.focus();
+    sendButton.disabled = false;
+  } else {
+    dataChannelSend.disabled = true;
+    sendButton.disabled = true;
+  }
 }
 // ICE candidates management
 function handleIceCandidate(event) {
-	console.log("handleIceCandidate event: ", event);
-	if (event.candidate) {
-		sendMessage({
-			type: "candidate",
-			label: event.candidate.sdpMLineIndex,
-			id: event.candidate.sdpMid,
-			candidate: event.candidate.candidate,
-		});
-	} else {
-		console.log("End of candidates.");
-	}
+  console.log("handleIceCandidate event: ", event);
+  if (event.candidate) {
+    sendMessage({
+      type: "candidate",
+      label: event.candidate.sdpMLineIndex,
+      id: event.candidate.sdpMid,
+      candidate: event.candidate.candidate,
+    });
+  } else {
+    console.log("End of candidates.");
+  }
 }
 // Create Offer
 function doCall(peerConnection, destinationId) {
-	console.log("Creating Offer...");
-	peerConnection.createOffer(
-		(sessionDescription) =>
-			setLocalAndSendMessage(sessionDescription, peerConnection, listPc.length - 1, destinationId),
-		onSignalingError,
-		sdpConstraints
-	);
+  console.log("Creating Offer...");
+  peerConnection.createOffer(
+    (sessionDescription) =>
+      setLocalAndSendMessage(
+        sessionDescription,
+        peerConnection,
+        listPc.length - 1,
+        destinationId
+      ),
+    onSignalingError,
+    sdpConstraints
+  );
 }
 // Signaling error handler
 function onSignalingError(error) {
-	console.log("Failed to create signaling message : " + error.name);
+  console.log("Failed to create signaling message : " + error.name);
 }
 // Create Answer
 function doAnswer(peerConnection, index, destinationId) {
-	console.log("Sending answer to peer.");
-	peerConnection.createAnswer(
-		(sessionDescription) =>
-			setLocalAndSendMessage(sessionDescription, peerConnection, index, destinationId),
-		onSignalingError,
-		sdpConstraints
-	);
+  console.log("Sending answer to peer.");
+  peerConnection.createAnswer(
+    (sessionDescription) =>
+      setLocalAndSendMessage(
+        sessionDescription,
+        peerConnection,
+        index,
+        destinationId
+      ),
+    onSignalingError,
+    sdpConstraints
+  );
 }
 // Success handler for both createOffer()
 // and createAnswer()
 function setLocalAndSendMessage(
-	sessionDescription,
-	peerConnection,
-	index,
-	destinationId = null,
-	isSendAll = false
+  sessionDescription,
+  peerConnection,
+  index,
+  destinationId = null,
+  isSendAll = false
 ) {
-	console.log("setLocalAndSendMessage", sessionDescription);
-	console.log("peerConnection", peerConnection);
-	peerConnection.setLocalDescription(sessionDescription);
-	sendMessage(sessionDescription, index, destinationId, isSendAll);
+  console.log("setLocalAndSendMessage", sessionDescription);
+  console.log("peerConnection", peerConnection);
+  peerConnection.setLocalDescription(sessionDescription);
+  sendMessage(sessionDescription, index, destinationId, isSendAll);
 }
 // Remote stream handlers...
 function handleRemoteStreamAdded(event, index, name) {
-	var video = document.getElementById("video" + index);
-	if (!video) {
-		console.log("Remote stream added.");
+  var video = document.getElementById("video" + index);
+  if (!video) {
+    console.log("Remote stream added.");
 
-		var divTag = document.createElement("div");
-		divTag.setAttribute("id", "div" + index);
-		divTag.setAttribute("class", "videoContainer");
-		divTag.style.cssText +=
-			"position: relative; width: 320px; display: inline-block; margin: 10px;";
+    var divTag = document.createElement("div");
+    divTag.setAttribute("id", "div" + index);
+    divTag.setAttribute("class", "videoContainer");
+    divTag.setAttribute("class", "xyz");
 
-		var nameTag = document.createElement("p");
-		nameTag.innerHTML = name;
+    var nameTag = document.createElement("p");
+    nameTag.innerHTML = name;
 
-		var divOverlay = document.createElement("div");
-		divOverlay.setAttribute("class", "overlay");
-		divOverlay.style.cssText +=
-			"position: absolute; bottom: 0; left: 10px; z-index:1; color: white; font-size: 24px;";
-		divOverlay.appendChild(nameTag);
+    var divOverlay = document.createElement("div");
+    divOverlay.setAttribute("class", "overlay");
+    divOverlay.className += " textOverlay";
+    divOverlay.appendChild(nameTag);
 
-		divTag.appendChild(divOverlay);
+    divTag.appendChild(divOverlay);
 
-		video = document.createElement("video");
-		video.setAttribute("id", "video" + index);
-		video.muted = false;
-		video.height = 240; // in px
-		video.width = 320; // in px
-		video.autoplay = true;
-		video.style.cssText += "position: relative; z-index: 0;";
-		video.setAttribute("poster", "https://i.postimg.cc/j5kb1NB4/Unknown-person.jpg");
+    video = document.createElement("video");
+    video.setAttribute("id", "video" + index);
+    video.muted = false;
+    video.autoplay = true;
+    video.setAttribute(
+      "poster",
+      "https://i.postimg.cc/j5kb1NB4/Unknown-person.jpg"
+    );
 
-		divTag.appendChild(video);
+    outer = document.createElement("div");
+    outer.setAttribute("class", "outer");
+    outer.appendChild(video);
 
-		const td = document.getElementById("remoteContainer");
-		td.appendChild(divTag);
-	}
+    divTag.appendChild(outer);
+    divTag.childNodes[1].className += " full";
+    divTag.childNodes[1].childNodes[0].className += " full";
 
-	//attachMediaStream(remoteVideo, event.stream);
-	if (window.URL) {
-		if ("srcObject" in video) {
-			if (event.stream.getVideoTracks().length > 0) {
-				video.srcObject = event.stream;
-			}
-		} else {
-			video.src = window.URL.createObjectURL(event.stream);
-		}
-	} else {
-		video.src = event.stream;
-	}
-	console.log("Remote stream attached!!.");
-	video = event.stream;
+    const td = document.getElementById("remoteContainer");
+    td.appendChild(divTag);
+
+    var len = td.childNodes.length;
+    if (len == 1) {
+      for (let i = 0; i < len; i++) {
+        td.childNodes[i].className = "two";
+      }
+    } else if (len > 4) {
+      for (let i = 0; i < len; i++) {
+        td.childNodes[i].className = "nine";
+        if ((len == 5 && i > 2) || (len == 8 && i > 5)) {
+          td.childNodes[i].className = "four";
+        }
+      }
+    } else {
+      for (let i = 0; i < len; i++) {
+        td.childNodes[i].className = "four";
+      }
+    }
+  }
+
+  //attachMediaStream(remoteVideo, event.stream);
+  if (window.URL) {
+    if ("srcObject" in video) {
+      if (event.stream.getVideoTracks().length > 0) {
+        video.srcObject = event.stream;
+      }
+    } else {
+      video.src = window.URL.createObjectURL(event.stream);
+    }
+  } else {
+    video.src = event.stream;
+  }
+  console.log("Remote stream attached!!.");
+  video = event.stream;
 }
 
 function handleRemoteStreamRemoved(event) {
-	console.log("Remote stream removed. Event: ", event);
+  console.log("Remote stream removed. Event: ", event);
 }
 // Clean-up functions...
 function hangup() {
-	console.log("Hanging up.");
-	stop();
-	listPc.map((item) => {
-		sendMessage("bye", -1, item.destinationId);
-	});
-	isSendBye = true;
-	window.close();
+  console.log("Hanging up.");
+  stop();
+  listPc.map((item) => {
+    sendMessage("bye", -1, item.destinationId);
+  });
+  isSendBye = true;
+  window.close();
 }
 function handleRemoteHangup(remoteSocketId) {
-	console.log("Session terminated.");
-	stop(remoteSocketId);
-	receiveTextarea.value = null;
-	sendTextarea.value = null;
-	// isInitiator = false;
+  console.log("Session terminated.");
+  stop(remoteSocketId);
+  receiveTextarea.value = null;
+  sendTextarea.value = null;
+  const td = document.getElementById("remoteContainer");
+  var len = td.childNodes.length;
+  if (len == 1) {
+    for (let i = 0; i < len; i++) {
+      td.childNodes[i].className = "two";
+    }
+  } else if (len > 4) {
+    for (let i = 0; i < len; i++) {
+      td.childNodes[i].className = "nine";
+      if ((len == 5 && i > 2) || (len == 8 && i > 5)) {
+        td.childNodes[i].className = "four";
+      }
+    }
+  } else {
+    for (let i = 0; i < len; i++) {
+      td.childNodes[i].className = "four";
+    }
+  }
+  // isInitiator = false;
 }
 function stop(remoteSocketId) {
-	isStarted = false;
+  isStarted = false;
 
-	// if (sendChannel) sendChannel.close();
-	// if (receiveChannel) receiveChannel.close();
-	listPc.map((item, index) => {
-		console.log(item.destinationId);
-		console.log(remoteSocketId);
-		console.log(index);
-		if (item.destinationId === remoteSocketId) {
-			if (item.pc) {
-				item.pc.close();
-				item.pc = null;
-				const video = document.getElementById("div" + index);
-				video.remove();
-			}
-		}
-	});
-	sendButton.disabled = true;
+  // if (sendChannel) sendChannel.close();
+  // if (receiveChannel) receiveChannel.close();
+  listPc.map((item, index) => {
+    console.log(item.destinationId);
+    console.log(remoteSocketId);
+    console.log(index);
+    if (item.destinationId === remoteSocketId) {
+      if (item.pc) {
+        item.pc.close();
+        item.pc = null;
+        const video = document.getElementById("div" + index);
+        video.remove();
+      }
+    }
+  });
+  sendButton.disabled = true;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -586,10 +764,13 @@ let selfieSegmentation = null;
 let libraryLoaded = false;
 
 const canvasOutput = document.getElementById("localCanvas");
+canvasOutput.width = 500;
+canvasOutput.height = 400;
+
 const ctx = canvasOutput.getContext("2d");
 
-const segmentationWidth = 480;
-const segmentationHeight = 320;
+const segmentationWidth = 500;
+const segmentationHeight = 400;
 const segmentationPixelCount = segmentationWidth * segmentationHeight;
 const segmentationMask = new ImageData(segmentationWidth, segmentationHeight);
 const segmentationMaskCanvas = document.createElement("canvas");
@@ -618,268 +799,289 @@ edgeBlurAmountText.innerText = edgeBlurRange.value;
 
 //#region Bodypix
 async function loadBodyPix() {
-	try {
-		const net = await bodyPix.load();
-		canvasOutput.hidden = false;
-		perform(net);
-	} catch (err) {
-		console.log(err);
-	}
+  try {
+    const net = await bodyPix.load();
+    canvasOutput.hidden = false;
+    perform(net);
+  } catch (err) {
+    console.log(err);
+  }
 }
 
 async function perform(net) {
-	while (selectedLibrary === "bodypix" && (blurredEnabled || virtualBackgroundEnabled)) {
-		segmentationMaskCtx.clearRect(0, 0, canvasOutput.width, canvasOutput.height);
-		segmentationMaskCtx.drawImage(localVideo, 0, 0, canvasOutput.width, canvasOutput.height);
+  while (
+    selectedLibrary === "bodypix" &&
+    (blurredEnabled || virtualBackgroundEnabled)
+  ) {
+    segmentationMaskCtx.clearRect(
+      0,
+      0,
+      canvasOutput.width,
+      canvasOutput.height
+    );
+    segmentationMaskCtx.drawImage(
+      localVideo,
+      0,
+      0,
+      canvasOutput.width,
+      canvasOutput.height
+    );
 
-		const segmentation = await net.segmentPerson(segmentationMaskCanvas);
-		for (let i = 0; i < segmentationPixelCount; i++) {
-			// Sets only the alpha component of each pixel
-			segmentationMask.data[i * 4 + 3] = segmentation.data[i] ? 255 : 0;
-		}
-		segmentationMaskCtx.putImageData(segmentationMask, 0, 0);
+    const segmentation = await net.segmentPerson(segmentationMaskCanvas);
+    for (let i = 0; i < segmentationPixelCount; i++) {
+      // Sets only the alpha component of each pixel
+      segmentationMask.data[i * 4 + 3] = segmentation.data[i] ? 255 : 0;
+    }
+    segmentationMaskCtx.putImageData(segmentationMask, 0, 0);
 
-		runPostProcessing(localVideo, segmentationMaskCanvas, backgroundBlurRange.value);
-	}
+    runPostProcessing(
+      localVideo,
+      segmentationMaskCanvas,
+      backgroundBlurRange.value
+    );
+  }
 }
 //#endregion
 
 function runPostProcessing(image, segmentation, blurAmount) {
-	clearCanvas();
+  clearCanvas();
 
-	ctx.globalCompositeOperation = "copy";
-	ctx.filter = "none";
+  ctx.globalCompositeOperation = "copy";
+  ctx.filter = "none";
 
-	if (blurredEnabled || virtualBackgroundEnabled) {
-		ctx.filter = `blur(${edgeBlurRange.value}px)`;
-		drawSegmentationMask(segmentation);
-		ctx.globalCompositeOperation = "source-in";
-		ctx.filter = "none";
-	}
+  if (blurredEnabled || virtualBackgroundEnabled) {
+    ctx.filter = `blur(${edgeBlurRange.value}px)`;
+    drawSegmentationMask(segmentation);
+    ctx.globalCompositeOperation = "source-in";
+    ctx.filter = "none";
+  }
 
-	ctx.drawImage(image, 0, 0, canvasOutput.width, canvasOutput.height);
+  ctx.drawImage(image, 0, 0, canvasOutput.width, canvasOutput.height);
 
-	if (virtualBackgroundEnabled) {
-		blurBackground(selectedBackground, 0);
-	}
+  if (virtualBackgroundEnabled) {
+    blurBackground(selectedBackground, 0);
+  }
 
-	if (blurredEnabled) {
-		if (isNone) {
-			blurAmount = 0;
-		}
-		blurBackground(image, blurAmount);
-	}
+  if (blurredEnabled) {
+    if (isNone) {
+      blurAmount = 0;
+    }
+    blurBackground(image, blurAmount);
+  }
 
-	ctx.restore();
+  ctx.restore();
 }
 
 function drawSegmentationMask(segmentation) {
-	ctx.drawImage(segmentation, 0, 0, canvasOutput.width, canvasOutput.height);
+  ctx.drawImage(segmentation, 0, 0, canvasOutput.width, canvasOutput.height);
 }
 
 function blurBackground(image, blurAmount) {
-	ctx.globalCompositeOperation = "destination-over";
-	ctx.filter = `blur(${blurAmount}px)`;
-	ctx.drawImage(image, 0, 0, canvasOutput.width, canvasOutput.height);
+  ctx.globalCompositeOperation = "destination-over";
+  ctx.filter = `blur(${blurAmount}px)`;
+  ctx.drawImage(image, 0, 0, canvasOutput.width, canvasOutput.height);
 }
 
 function clearCanvas() {
-	ctx.clearRect(0, 0, canvasOutput.width, canvasOutput.height);
+  ctx.clearRect(0, 0, canvasOutput.width, canvasOutput.height);
 }
 
 /* eslint-disable default-case */
 function onLibraryLoad(library = "bodypix") {
-	libraryLoaded = true;
-	switch (library) {
-		case "bodypix":
-			loadBodyPix();
-			setResultStream();
-			break;
-	}
+  libraryLoaded = true;
+  switch (library) {
+    case "bodypix":
+      loadBodyPix();
+      setResultStream();
+      break;
+  }
 
-	if (library === "bodypix") {
-		backgroundBlurRange.max = 20;
-	} else {
-		if (backgroundBlurRange.value > 10) {
-			backgroundBlurRange.value = 10;
-			blurAmountText.innerText = backgroundBlurRange.value;
-		}
+  if (library === "bodypix") {
+    backgroundBlurRange.max = 20;
+  } else {
+    if (backgroundBlurRange.value > 10) {
+      backgroundBlurRange.value = 10;
+      blurAmountText.innerText = backgroundBlurRange.value;
+    }
 
-		backgroundBlurRange.max = 10;
-	}
+    backgroundBlurRange.max = 10;
+  }
 }
 
 /* eslint-disable default-case */
 async function onLibraryUnload(library) {
-	clearCanvas();
+  clearCanvas();
 
-	switch (library) {
-		case "bodypix":
-			localVideo.hidden = false;
-			canvasOutput.hidden = true;
-			break;
-	}
+  switch (library) {
+    case "bodypix":
+      localVideo.hidden = false;
+      canvasOutput.hidden = true;
+      break;
+  }
 
-	const stream = localVideo.captureStream();
-	listPc.map((item, index) => {
-		item.pc.addStream(stream);
-		item.pc.createOffer(
-			(sessionDescription) =>
-				setLocalAndSendMessage(sessionDescription, item.pc, index, item.destinationId, true),
-			onSignalingError,
-			sdpConstraints
-		);
-	});
+  const stream = localVideo.captureStream();
+  listPc.map((item, index) => {
+    item.pc.addStream(stream);
+    item.pc.createOffer(
+      (sessionDescription) =>
+        setLocalAndSendMessage(
+          sessionDescription,
+          item.pc,
+          index,
+          item.destinationId,
+          true
+        ),
+      onSignalingError,
+      sdpConstraints
+    );
+  });
 
-	libraryLoaded = false;
+  libraryLoaded = false;
 }
 
 function setResultStream() {
-	localVideo.hidden = true;
-	const stream = canvasOutput.captureStream();
+  localVideo.hidden = true;
+  const stream = canvasOutput.captureStream();
 
-	console.log(stream);
-	listPc.map((item, index) => {
-		item.pc.addStream(stream);
-		item.pc.createOffer(
-			(sessionDescription) =>
-				setLocalAndSendMessage(sessionDescription, item.pc, index, item.destinationId, true),
-			onSignalingError,
-			sdpConstraints
-		);
-	});
+  console.log(stream);
+  listPc.map((item, index) => {
+    item.pc.addStream(stream);
+    item.pc.createOffer(
+      (sessionDescription) =>
+        setLocalAndSendMessage(
+          sessionDescription,
+          item.pc,
+          index,
+          item.destinationId,
+          true
+        ),
+      onSignalingError,
+      sdpConstraints
+    );
+  });
 }
 
 noBackgroundBtn.addEventListener("click", (e) => {
-	document.getElementById("controlCard").hidden = true;
-	blurredEnabled = true;
-	isNone = true;
-	virtualBackgroundEnabled = false;
-	backgroundBlurRange.disabled = true;
-	edgeBlurRange.disabled = true;
+  document.getElementById("controlCard").hidden = true;
+  blurredEnabled = true;
+  isNone = true;
+  virtualBackgroundEnabled = false;
+  backgroundBlurRange.disabled = true;
+  edgeBlurRange.disabled = true;
 
-	noBackgroundBtn.classList.add("selected");
-	blurBackgroundBtn.classList.remove("selected");
-	virutalBackgroundBtn.classList.remove("selected");
-
-	if (!libraryLoaded) {
-		onLibraryLoad("none");
-	}
+  if (!libraryLoaded) {
+    onLibraryLoad("none");
+  }
 });
 
 blurBackgroundBtn.addEventListener("click", (e) => {
-	document.getElementById("controlCard").hidden = false;
-	blurredEnabled = true;
-	isNone = false;
-	virtualBackgroundEnabled = false;
-	backgroundBlurRange.disabled = false;
+  document.getElementById("controlCard").hidden = false;
+  blurredEnabled = true;
+  isNone = false;
+  virtualBackgroundEnabled = false;
+  backgroundBlurRange.disabled = false;
 
-	if (selectedLibrary !== "vectorly") {
-		edgeBlurRange.disabled = false;
-	} else {
-		edgeBlurRange.disabled = true;
-	}
+  if (selectedLibrary !== "vectorly") {
+    edgeBlurRange.disabled = false;
+  } else {
+    edgeBlurRange.disabled = true;
+  }
 
-	noBackgroundBtn.classList.remove("selected");
-	blurBackgroundBtn.classList.add("selected");
-	virutalBackgroundBtn.classList.remove("selected");
-
-	if (!libraryLoaded) {
-		console.log(1);
-		onLibraryLoad();
-	} else if (selectedLibrary === "vectorly") {
-		changeBackground("blur");
-	}
+  if (!libraryLoaded) {
+    console.log(1);
+    onLibraryLoad();
+  } else if (selectedLibrary === "vectorly") {
+    changeBackground("blur");
+  }
 });
 
 virutalBackgroundBtn.addEventListener("click", (e) => {
-	blurredEnabled = false;
-	virtualBackgroundEnabled = true;
-	backgroundBlurRange.disabled = true;
+  blurredEnabled = false;
+  virtualBackgroundEnabled = true;
+  backgroundBlurRange.disabled = true;
 
-	if (selectedLibrary !== "vectorly") {
-		edgeBlurRange.disabled = false;
-	} else {
-		edgeBlurRange.disabled = true;
-	}
+  if (selectedLibrary !== "vectorly") {
+    edgeBlurRange.disabled = false;
+  } else {
+    edgeBlurRange.disabled = true;
+  }
 
-	noBackgroundBtn.classList.remove("selected");
-	blurBackgroundBtn.classList.remove("selected");
-	virutalBackgroundBtn.classList.add("selected");
+  selectedBackground = document.getElementById("virtualImage");
 
-	selectedBackground = document.getElementById("virtualImage");
-
-	if (!libraryLoaded) {
-		console.log(1);
-		onLibraryLoad();
-	} else if (selectedLibrary === "vectorly") {
-		changeBackground(selectedBackground.src);
-	}
+  if (!libraryLoaded) {
+    console.log(1);
+    onLibraryLoad();
+  } else if (selectedLibrary === "vectorly") {
+    changeBackground(selectedBackground.src);
+  }
 });
 
 microBtn.addEventListener("click", (e) => {
-	if (localStream && localStream.getAudioTracks().length > 0) {
-		localStream.getAudioTracks()[0].enabled = !localStream.getAudioTracks()[0].enabled;
-		if (localStream.getAudioTracks()[0].enabled) {
-			muteBtn.style.display = "none";
-			unmuteBtn.style.display = "block";
-			microBtn.style.backgroundColor = "#3C4043";
-			microBtn.title = "Turn off microphone";
-		} else {
-			muteBtn.style.display = "block";
-			unmuteBtn.style.display = "none";
-			microBtn.style.backgroundColor = "red";
-			microBtn.title = "Turn on microphone";
-		}
-	} else {
-		muteBtn.style.display = "block";
-		unmuteBtn.style.display = "none";
-		microBtn.style.backgroundColor = "red";
-		microBtn.title = "Turn on microphone";
-	}
+  if (localStream && localStream.getAudioTracks().length > 0) {
+    localStream.getAudioTracks()[0].enabled =
+      !localStream.getAudioTracks()[0].enabled;
+    if (localStream.getAudioTracks()[0].enabled) {
+      muteBtn.style.display = "none";
+      unmuteBtn.style.display = "block";
+      microBtn.style.backgroundColor = "#3C4043";
+      microBtn.title = "Turn off microphone";
+    } else {
+      muteBtn.style.display = "block";
+      unmuteBtn.style.display = "none";
+      microBtn.style.backgroundColor = "red";
+      microBtn.title = "Turn on microphone";
+    }
+  } else {
+    muteBtn.style.display = "block";
+    unmuteBtn.style.display = "none";
+    microBtn.style.backgroundColor = "red";
+    microBtn.title = "Turn on microphone";
+  }
 });
 
 cameraBtn.addEventListener("click", (e) => {
-	if (localStream && localStream.getVideoTracks().length > 0) {
-		localStream.getVideoTracks()[0].enabled = !localStream.getVideoTracks()[0].enabled;
-		cameraBtn.classList.toggle("turned-off");
-		if (localStream.getVideoTracks()[0].enabled) {
-			cameraOffBtn.style.display = "none";
-			cameraOnBtn.style.display = "block";
-			cameraBtn.title = "Turn off camera";
-		} else {
-			cameraOffBtn.style.display = "block";
-			cameraOnBtn.style.display = "none";
-			cameraBtn.style.backgroundColor = "red";
-			cameraBtn.title = "Turn on camera";
-		}
-	} else {
-		cameraOffBtn.style.display = "block";
-		cameraOnBtn.style.display = "none";
-		cameraBtn.style.backgroundColor = "red";
-		cameraBtn.title = "Turn on camera";
-	}
+  if (localStream && localStream.getVideoTracks().length > 0) {
+    localStream.getVideoTracks()[0].enabled =
+      !localStream.getVideoTracks()[0].enabled;
+    cameraBtn.classList.toggle("turned-off");
+    if (localStream.getVideoTracks()[0].enabled) {
+      cameraOffBtn.style.display = "none";
+      cameraOnBtn.style.display = "block";
+      cameraBtn.style.backgroundColor = "#3C4043";
+      cameraBtn.title = "Turn off camera";
+    } else {
+      cameraOffBtn.style.display = "block";
+      cameraOnBtn.style.display = "none";
+      cameraBtn.style.backgroundColor = "red";
+      cameraBtn.title = "Turn on camera";
+    }
+  } else {
+    cameraOffBtn.style.display = "block";
+    cameraOnBtn.style.display = "none";
+    cameraBtn.style.backgroundColor = "red";
+    cameraBtn.title = "Turn on camera";
+  }
 });
 
 backgroundBlurRange.addEventListener("input", (e) => {
-	blurAmountText.innerText = e.target.value;
+  blurAmountText.innerText = e.target.value;
 
-	if (selectedLibrary === "vectorly") {
-		vectorlyFilter.changeBlurRadius(e.target.value);
-	}
+  if (selectedLibrary === "vectorly") {
+    vectorlyFilter.changeBlurRadius(e.target.value);
+  }
 });
 
 edgeBlurRange.addEventListener("input", (e) => {
-	edgeBlurAmountText.innerText = e.target.value;
+  edgeBlurAmountText.innerText = e.target.value;
 });
 
 dataChannelSend.addEventListener("input", (e) => {
-	console.log(dataChannelSend.value);
-	if (dataChannelSend.value !== "") {
-		sendButton.disabled = false;
-	} else {
-		sendButton.disabled = true;
-	}
+  console.log(dataChannelSend.value);
+  if (dataChannelSend.value !== "") {
+    sendButton.disabled = false;
+  } else {
+    sendButton.disabled = true;
+  }
 });
 
 },{"cors":5,"socket.io-client":32}],2:[function(require,module,exports){
@@ -2993,7 +3195,7 @@ function numberIsNaN (obj) {
 }
 
 }).call(this)}).call(this,require("buffer").Buffer)
-},{"base64-js":3,"buffer":4,"ieee754":27}],5:[function(require,module,exports){
+},{"base64-js":3,"buffer":4,"ieee754":28}],5:[function(require,module,exports){
 (function () {
 
   'use strict';
@@ -3233,556 +3435,7 @@ function numberIsNaN (obj) {
 
 }());
 
-},{"object-assign":29,"vary":40}],6:[function(require,module,exports){
-(function (process){(function (){
-/* eslint-env browser */
-
-/**
- * This is the web browser implementation of `debug()`.
- */
-
-exports.formatArgs = formatArgs;
-exports.save = save;
-exports.load = load;
-exports.useColors = useColors;
-exports.storage = localstorage();
-exports.destroy = (() => {
-	let warned = false;
-
-	return () => {
-		if (!warned) {
-			warned = true;
-			console.warn('Instance method `debug.destroy()` is deprecated and no longer does anything. It will be removed in the next major version of `debug`.');
-		}
-	};
-})();
-
-/**
- * Colors.
- */
-
-exports.colors = [
-	'#0000CC',
-	'#0000FF',
-	'#0033CC',
-	'#0033FF',
-	'#0066CC',
-	'#0066FF',
-	'#0099CC',
-	'#0099FF',
-	'#00CC00',
-	'#00CC33',
-	'#00CC66',
-	'#00CC99',
-	'#00CCCC',
-	'#00CCFF',
-	'#3300CC',
-	'#3300FF',
-	'#3333CC',
-	'#3333FF',
-	'#3366CC',
-	'#3366FF',
-	'#3399CC',
-	'#3399FF',
-	'#33CC00',
-	'#33CC33',
-	'#33CC66',
-	'#33CC99',
-	'#33CCCC',
-	'#33CCFF',
-	'#6600CC',
-	'#6600FF',
-	'#6633CC',
-	'#6633FF',
-	'#66CC00',
-	'#66CC33',
-	'#9900CC',
-	'#9900FF',
-	'#9933CC',
-	'#9933FF',
-	'#99CC00',
-	'#99CC33',
-	'#CC0000',
-	'#CC0033',
-	'#CC0066',
-	'#CC0099',
-	'#CC00CC',
-	'#CC00FF',
-	'#CC3300',
-	'#CC3333',
-	'#CC3366',
-	'#CC3399',
-	'#CC33CC',
-	'#CC33FF',
-	'#CC6600',
-	'#CC6633',
-	'#CC9900',
-	'#CC9933',
-	'#CCCC00',
-	'#CCCC33',
-	'#FF0000',
-	'#FF0033',
-	'#FF0066',
-	'#FF0099',
-	'#FF00CC',
-	'#FF00FF',
-	'#FF3300',
-	'#FF3333',
-	'#FF3366',
-	'#FF3399',
-	'#FF33CC',
-	'#FF33FF',
-	'#FF6600',
-	'#FF6633',
-	'#FF9900',
-	'#FF9933',
-	'#FFCC00',
-	'#FFCC33'
-];
-
-/**
- * Currently only WebKit-based Web Inspectors, Firefox >= v31,
- * and the Firebug extension (any Firefox version) are known
- * to support "%c" CSS customizations.
- *
- * TODO: add a `localStorage` variable to explicitly enable/disable colors
- */
-
-// eslint-disable-next-line complexity
-function useColors() {
-	// NB: In an Electron preload script, document will be defined but not fully
-	// initialized. Since we know we're in Chrome, we'll just detect this case
-	// explicitly
-	if (typeof window !== 'undefined' && window.process && (window.process.type === 'renderer' || window.process.__nwjs)) {
-		return true;
-	}
-
-	// Internet Explorer and Edge do not support colors.
-	if (typeof navigator !== 'undefined' && navigator.userAgent && navigator.userAgent.toLowerCase().match(/(edge|trident)\/(\d+)/)) {
-		return false;
-	}
-
-	// Is webkit? http://stackoverflow.com/a/16459606/376773
-	// document is undefined in react-native: https://github.com/facebook/react-native/pull/1632
-	return (typeof document !== 'undefined' && document.documentElement && document.documentElement.style && document.documentElement.style.WebkitAppearance) ||
-		// Is firebug? http://stackoverflow.com/a/398120/376773
-		(typeof window !== 'undefined' && window.console && (window.console.firebug || (window.console.exception && window.console.table))) ||
-		// Is firefox >= v31?
-		// https://developer.mozilla.org/en-US/docs/Tools/Web_Console#Styling_messages
-		(typeof navigator !== 'undefined' && navigator.userAgent && navigator.userAgent.toLowerCase().match(/firefox\/(\d+)/) && parseInt(RegExp.$1, 10) >= 31) ||
-		// Double check webkit in userAgent just in case we are in a worker
-		(typeof navigator !== 'undefined' && navigator.userAgent && navigator.userAgent.toLowerCase().match(/applewebkit\/(\d+)/));
-}
-
-/**
- * Colorize log arguments if enabled.
- *
- * @api public
- */
-
-function formatArgs(args) {
-	args[0] = (this.useColors ? '%c' : '') +
-		this.namespace +
-		(this.useColors ? ' %c' : ' ') +
-		args[0] +
-		(this.useColors ? '%c ' : ' ') +
-		'+' + module.exports.humanize(this.diff);
-
-	if (!this.useColors) {
-		return;
-	}
-
-	const c = 'color: ' + this.color;
-	args.splice(1, 0, c, 'color: inherit');
-
-	// The final "%c" is somewhat tricky, because there could be other
-	// arguments passed either before or after the %c, so we need to
-	// figure out the correct index to insert the CSS into
-	let index = 0;
-	let lastC = 0;
-	args[0].replace(/%[a-zA-Z%]/g, match => {
-		if (match === '%%') {
-			return;
-		}
-		index++;
-		if (match === '%c') {
-			// We only are interested in the *last* %c
-			// (the user may have provided their own)
-			lastC = index;
-		}
-	});
-
-	args.splice(lastC, 0, c);
-}
-
-/**
- * Invokes `console.debug()` when available.
- * No-op when `console.debug` is not a "function".
- * If `console.debug` is not available, falls back
- * to `console.log`.
- *
- * @api public
- */
-exports.log = console.debug || console.log || (() => {});
-
-/**
- * Save `namespaces`.
- *
- * @param {String} namespaces
- * @api private
- */
-function save(namespaces) {
-	try {
-		if (namespaces) {
-			exports.storage.setItem('debug', namespaces);
-		} else {
-			exports.storage.removeItem('debug');
-		}
-	} catch (error) {
-		// Swallow
-		// XXX (@Qix-) should we be logging these?
-	}
-}
-
-/**
- * Load `namespaces`.
- *
- * @return {String} returns the previously persisted debug modes
- * @api private
- */
-function load() {
-	let r;
-	try {
-		r = exports.storage.getItem('debug');
-	} catch (error) {
-		// Swallow
-		// XXX (@Qix-) should we be logging these?
-	}
-
-	// If debug isn't set in LS, and we're in Electron, try to load $DEBUG
-	if (!r && typeof process !== 'undefined' && 'env' in process) {
-		r = process.env.DEBUG;
-	}
-
-	return r;
-}
-
-/**
- * Localstorage attempts to return the localstorage.
- *
- * This is necessary because safari throws
- * when a user disables cookies/localstorage
- * and you attempt to access it.
- *
- * @return {LocalStorage}
- * @api private
- */
-
-function localstorage() {
-	try {
-		// TVMLKit (Apple TV JS Runtime) does not have a window object, just localStorage in the global context
-		// The Browser also has localStorage in the global context.
-		return localStorage;
-	} catch (error) {
-		// Swallow
-		// XXX (@Qix-) should we be logging these?
-	}
-}
-
-module.exports = require('./common')(exports);
-
-const {formatters} = module.exports;
-
-/**
- * Map %j to `JSON.stringify()`, since no Web Inspectors do that by default.
- */
-
-formatters.j = function (v) {
-	try {
-		return JSON.stringify(v);
-	} catch (error) {
-		return '[UnexpectedJSONParseError]: ' + error.message;
-	}
-};
-
-}).call(this)}).call(this,require('_process'))
-},{"./common":7,"_process":30}],7:[function(require,module,exports){
-
-/**
- * This is the common logic for both the Node.js and web browser
- * implementations of `debug()`.
- */
-
-function setup(env) {
-	createDebug.debug = createDebug;
-	createDebug.default = createDebug;
-	createDebug.coerce = coerce;
-	createDebug.disable = disable;
-	createDebug.enable = enable;
-	createDebug.enabled = enabled;
-	createDebug.humanize = require('ms');
-	createDebug.destroy = destroy;
-
-	Object.keys(env).forEach(key => {
-		createDebug[key] = env[key];
-	});
-
-	/**
-	* The currently active debug mode names, and names to skip.
-	*/
-
-	createDebug.names = [];
-	createDebug.skips = [];
-
-	/**
-	* Map of special "%n" handling functions, for the debug "format" argument.
-	*
-	* Valid key names are a single, lower or upper-case letter, i.e. "n" and "N".
-	*/
-	createDebug.formatters = {};
-
-	/**
-	* Selects a color for a debug namespace
-	* @param {String} namespace The namespace string for the debug instance to be colored
-	* @return {Number|String} An ANSI color code for the given namespace
-	* @api private
-	*/
-	function selectColor(namespace) {
-		let hash = 0;
-
-		for (let i = 0; i < namespace.length; i++) {
-			hash = ((hash << 5) - hash) + namespace.charCodeAt(i);
-			hash |= 0; // Convert to 32bit integer
-		}
-
-		return createDebug.colors[Math.abs(hash) % createDebug.colors.length];
-	}
-	createDebug.selectColor = selectColor;
-
-	/**
-	* Create a debugger with the given `namespace`.
-	*
-	* @param {String} namespace
-	* @return {Function}
-	* @api public
-	*/
-	function createDebug(namespace) {
-		let prevTime;
-		let enableOverride = null;
-		let namespacesCache;
-		let enabledCache;
-
-		function debug(...args) {
-			// Disabled?
-			if (!debug.enabled) {
-				return;
-			}
-
-			const self = debug;
-
-			// Set `diff` timestamp
-			const curr = Number(new Date());
-			const ms = curr - (prevTime || curr);
-			self.diff = ms;
-			self.prev = prevTime;
-			self.curr = curr;
-			prevTime = curr;
-
-			args[0] = createDebug.coerce(args[0]);
-
-			if (typeof args[0] !== 'string') {
-				// Anything else let's inspect with %O
-				args.unshift('%O');
-			}
-
-			// Apply any `formatters` transformations
-			let index = 0;
-			args[0] = args[0].replace(/%([a-zA-Z%])/g, (match, format) => {
-				// If we encounter an escaped % then don't increase the array index
-				if (match === '%%') {
-					return '%';
-				}
-				index++;
-				const formatter = createDebug.formatters[format];
-				if (typeof formatter === 'function') {
-					const val = args[index];
-					match = formatter.call(self, val);
-
-					// Now we need to remove `args[index]` since it's inlined in the `format`
-					args.splice(index, 1);
-					index--;
-				}
-				return match;
-			});
-
-			// Apply env-specific formatting (colors, etc.)
-			createDebug.formatArgs.call(self, args);
-
-			const logFn = self.log || createDebug.log;
-			logFn.apply(self, args);
-		}
-
-		debug.namespace = namespace;
-		debug.useColors = createDebug.useColors();
-		debug.color = createDebug.selectColor(namespace);
-		debug.extend = extend;
-		debug.destroy = createDebug.destroy; // XXX Temporary. Will be removed in the next major release.
-
-		Object.defineProperty(debug, 'enabled', {
-			enumerable: true,
-			configurable: false,
-			get: () => {
-				if (enableOverride !== null) {
-					return enableOverride;
-				}
-				if (namespacesCache !== createDebug.namespaces) {
-					namespacesCache = createDebug.namespaces;
-					enabledCache = createDebug.enabled(namespace);
-				}
-
-				return enabledCache;
-			},
-			set: v => {
-				enableOverride = v;
-			}
-		});
-
-		// Env-specific initialization logic for debug instances
-		if (typeof createDebug.init === 'function') {
-			createDebug.init(debug);
-		}
-
-		return debug;
-	}
-
-	function extend(namespace, delimiter) {
-		const newDebug = createDebug(this.namespace + (typeof delimiter === 'undefined' ? ':' : delimiter) + namespace);
-		newDebug.log = this.log;
-		return newDebug;
-	}
-
-	/**
-	* Enables a debug mode by namespaces. This can include modes
-	* separated by a colon and wildcards.
-	*
-	* @param {String} namespaces
-	* @api public
-	*/
-	function enable(namespaces) {
-		createDebug.save(namespaces);
-		createDebug.namespaces = namespaces;
-
-		createDebug.names = [];
-		createDebug.skips = [];
-
-		let i;
-		const split = (typeof namespaces === 'string' ? namespaces : '').split(/[\s,]+/);
-		const len = split.length;
-
-		for (i = 0; i < len; i++) {
-			if (!split[i]) {
-				// ignore empty strings
-				continue;
-			}
-
-			namespaces = split[i].replace(/\*/g, '.*?');
-
-			if (namespaces[0] === '-') {
-				createDebug.skips.push(new RegExp('^' + namespaces.slice(1) + '$'));
-			} else {
-				createDebug.names.push(new RegExp('^' + namespaces + '$'));
-			}
-		}
-	}
-
-	/**
-	* Disable debug output.
-	*
-	* @return {String} namespaces
-	* @api public
-	*/
-	function disable() {
-		const namespaces = [
-			...createDebug.names.map(toNamespace),
-			...createDebug.skips.map(toNamespace).map(namespace => '-' + namespace)
-		].join(',');
-		createDebug.enable('');
-		return namespaces;
-	}
-
-	/**
-	* Returns true if the given mode name is enabled, false otherwise.
-	*
-	* @param {String} name
-	* @return {Boolean}
-	* @api public
-	*/
-	function enabled(name) {
-		if (name[name.length - 1] === '*') {
-			return true;
-		}
-
-		let i;
-		let len;
-
-		for (i = 0, len = createDebug.skips.length; i < len; i++) {
-			if (createDebug.skips[i].test(name)) {
-				return false;
-			}
-		}
-
-		for (i = 0, len = createDebug.names.length; i < len; i++) {
-			if (createDebug.names[i].test(name)) {
-				return true;
-			}
-		}
-
-		return false;
-	}
-
-	/**
-	* Convert regexp to namespace
-	*
-	* @param {RegExp} regxep
-	* @return {String} namespace
-	* @api private
-	*/
-	function toNamespace(regexp) {
-		return regexp.toString()
-			.substring(2, regexp.toString().length - 2)
-			.replace(/\.\*\?$/, '*');
-	}
-
-	/**
-	* Coerce `val`.
-	*
-	* @param {Mixed} val
-	* @return {Mixed}
-	* @api private
-	*/
-	function coerce(val) {
-		if (val instanceof Error) {
-			return val.stack || val.message;
-		}
-		return val;
-	}
-
-	/**
-	* XXX DO NOT USE. This is a temporary stub function.
-	* XXX It WILL be removed in the next major release.
-	*/
-	function destroy() {
-		console.warn('Instance method `debug.destroy()` is deprecated and no longer does anything. It will be removed in the next major version of `debug`.');
-	}
-
-	createDebug.enable(createDebug.load());
-
-	return createDebug;
-}
-
-module.exports = setup;
-
-},{"ms":28}],8:[function(require,module,exports){
+},{"object-assign":29,"vary":46}],6:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.hasCORS = void 0;
@@ -3798,7 +3451,7 @@ catch (err) {
 }
 exports.hasCORS = value;
 
-},{}],9:[function(require,module,exports){
+},{}],7:[function(require,module,exports){
 "use strict";
 // imported from https://github.com/galkn/querystring
 /**
@@ -3839,7 +3492,7 @@ function decode(qs) {
 }
 exports.decode = decode;
 
-},{}],10:[function(require,module,exports){
+},{}],8:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.parse = void 0;
@@ -3894,7 +3547,7 @@ function queryKey(uri, query) {
     return data;
 }
 
-},{}],11:[function(require,module,exports){
+},{}],9:[function(require,module,exports){
 // imported from https://github.com/unshiftio/yeast
 'use strict';
 Object.defineProperty(exports, "__esModule", { value: true });
@@ -3951,7 +3604,7 @@ exports.yeast = yeast;
 for (; i < length; i++)
     map[alphabet[i]] = i;
 
-},{}],12:[function(require,module,exports){
+},{}],10:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.globalThisShim = void 0;
@@ -3967,7 +3620,7 @@ exports.globalThisShim = (() => {
     }
 })();
 
-},{}],13:[function(require,module,exports){
+},{}],11:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.nextTick = exports.parse = exports.installTimerFunctions = exports.transports = exports.Transport = exports.protocol = exports.Socket = void 0;
@@ -3985,7 +3638,7 @@ Object.defineProperty(exports, "parse", { enumerable: true, get: function () { r
 var websocket_constructor_js_1 = require("./transports/websocket-constructor.js");
 Object.defineProperty(exports, "nextTick", { enumerable: true, get: function () { return websocket_constructor_js_1.nextTick; } });
 
-},{"./contrib/parseuri.js":10,"./socket.js":14,"./transport.js":15,"./transports/index.js":16,"./transports/websocket-constructor.js":18,"./util.js":21}],14:[function(require,module,exports){
+},{"./contrib/parseuri.js":8,"./socket.js":12,"./transport.js":13,"./transports/index.js":14,"./transports/websocket-constructor.js":16,"./util.js":19}],12:[function(require,module,exports){
 "use strict";
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
@@ -4600,7 +4253,7 @@ class Socket extends component_emitter_1.Emitter {
 exports.Socket = Socket;
 Socket.protocol = engine_io_parser_1.protocol;
 
-},{"./contrib/parseqs.js":9,"./contrib/parseuri.js":10,"./transports/index.js":16,"./util.js":21,"@socket.io/component-emitter":2,"debug":6,"engine.io-parser":26}],15:[function(require,module,exports){
+},{"./contrib/parseqs.js":7,"./contrib/parseuri.js":8,"./transports/index.js":14,"./util.js":19,"@socket.io/component-emitter":2,"debug":20,"engine.io-parser":27}],13:[function(require,module,exports){
 "use strict";
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
@@ -4728,7 +4381,7 @@ class Transport extends component_emitter_1.Emitter {
 }
 exports.Transport = Transport;
 
-},{"./util.js":21,"@socket.io/component-emitter":2,"debug":6,"engine.io-parser":26}],16:[function(require,module,exports){
+},{"./util.js":19,"@socket.io/component-emitter":2,"debug":20,"engine.io-parser":27}],14:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.transports = void 0;
@@ -4739,7 +4392,7 @@ exports.transports = {
     polling: polling_js_1.Polling
 };
 
-},{"./polling.js":17,"./websocket.js":19}],17:[function(require,module,exports){
+},{"./polling.js":15,"./websocket.js":17}],15:[function(require,module,exports){
 "use strict";
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
@@ -5168,7 +4821,7 @@ function unloadHandler() {
     }
 }
 
-},{"../contrib/parseqs.js":9,"../contrib/yeast.js":11,"../globalThis.js":12,"../transport.js":15,"../util.js":21,"./xmlhttprequest.js":20,"@socket.io/component-emitter":2,"debug":6,"engine.io-parser":26}],18:[function(require,module,exports){
+},{"../contrib/parseqs.js":7,"../contrib/yeast.js":9,"../globalThis.js":10,"../transport.js":13,"../util.js":19,"./xmlhttprequest.js":18,"@socket.io/component-emitter":2,"debug":20,"engine.io-parser":27}],16:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.defaultBinaryType = exports.usingBrowserWebSocket = exports.WebSocket = exports.nextTick = void 0;
@@ -5186,7 +4839,7 @@ exports.WebSocket = globalThis_js_1.globalThisShim.WebSocket || globalThis_js_1.
 exports.usingBrowserWebSocket = true;
 exports.defaultBinaryType = "arraybuffer";
 
-},{"../globalThis.js":12}],19:[function(require,module,exports){
+},{"../globalThis.js":10}],17:[function(require,module,exports){
 (function (Buffer){(function (){
 "use strict";
 var __importDefault = (this && this.__importDefault) || function (mod) {
@@ -5388,7 +5041,7 @@ class WS extends transport_js_1.Transport {
 exports.WS = WS;
 
 }).call(this)}).call(this,require("buffer").Buffer)
-},{"../contrib/parseqs.js":9,"../contrib/yeast.js":11,"../transport.js":15,"../util.js":21,"./websocket-constructor.js":18,"buffer":4,"debug":6,"engine.io-parser":26}],20:[function(require,module,exports){
+},{"../contrib/parseqs.js":7,"../contrib/yeast.js":9,"../transport.js":13,"../util.js":19,"./websocket-constructor.js":16,"buffer":4,"debug":20,"engine.io-parser":27}],18:[function(require,module,exports){
 "use strict";
 // browser shim for xmlhttprequest module
 Object.defineProperty(exports, "__esModule", { value: true });
@@ -5413,7 +5066,7 @@ function XHR(opts) {
 }
 exports.XHR = XHR;
 
-},{"../contrib/has-cors.js":8,"../globalThis.js":12}],21:[function(require,module,exports){
+},{"../contrib/has-cors.js":6,"../globalThis.js":10}],19:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.byteLength = exports.installTimerFunctions = exports.pick = void 0;
@@ -5473,303 +5126,556 @@ function utf8Length(str) {
     return length;
 }
 
-},{"./globalThis.js":12}],22:[function(require,module,exports){
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.ERROR_PACKET = exports.PACKET_TYPES_REVERSE = exports.PACKET_TYPES = void 0;
-const PACKET_TYPES = Object.create(null); // no Map = no polyfill
-exports.PACKET_TYPES = PACKET_TYPES;
-PACKET_TYPES["open"] = "0";
-PACKET_TYPES["close"] = "1";
-PACKET_TYPES["ping"] = "2";
-PACKET_TYPES["pong"] = "3";
-PACKET_TYPES["message"] = "4";
-PACKET_TYPES["upgrade"] = "5";
-PACKET_TYPES["noop"] = "6";
-const PACKET_TYPES_REVERSE = Object.create(null);
-exports.PACKET_TYPES_REVERSE = PACKET_TYPES_REVERSE;
-Object.keys(PACKET_TYPES).forEach(key => {
-    PACKET_TYPES_REVERSE[PACKET_TYPES[key]] = key;
-});
-const ERROR_PACKET = { type: "error", data: "parser error" };
-exports.ERROR_PACKET = ERROR_PACKET;
+},{"./globalThis.js":10}],20:[function(require,module,exports){
+(function (process){(function (){
+/* eslint-env browser */
 
-},{}],23:[function(require,module,exports){
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.decode = exports.encode = void 0;
-// imported from https://github.com/socketio/base64-arraybuffer
-const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
-// Use a lookup table to find the index.
-const lookup = typeof Uint8Array === 'undefined' ? [] : new Uint8Array(256);
-for (let i = 0; i < chars.length; i++) {
-    lookup[chars.charCodeAt(i)] = i;
-}
-const encode = (arraybuffer) => {
-    let bytes = new Uint8Array(arraybuffer), i, len = bytes.length, base64 = '';
-    for (i = 0; i < len; i += 3) {
-        base64 += chars[bytes[i] >> 2];
-        base64 += chars[((bytes[i] & 3) << 4) | (bytes[i + 1] >> 4)];
-        base64 += chars[((bytes[i + 1] & 15) << 2) | (bytes[i + 2] >> 6)];
-        base64 += chars[bytes[i + 2] & 63];
-    }
-    if (len % 3 === 2) {
-        base64 = base64.substring(0, base64.length - 1) + '=';
-    }
-    else if (len % 3 === 1) {
-        base64 = base64.substring(0, base64.length - 2) + '==';
-    }
-    return base64;
-};
-exports.encode = encode;
-const decode = (base64) => {
-    let bufferLength = base64.length * 0.75, len = base64.length, i, p = 0, encoded1, encoded2, encoded3, encoded4;
-    if (base64[base64.length - 1] === '=') {
-        bufferLength--;
-        if (base64[base64.length - 2] === '=') {
-            bufferLength--;
-        }
-    }
-    const arraybuffer = new ArrayBuffer(bufferLength), bytes = new Uint8Array(arraybuffer);
-    for (i = 0; i < len; i += 4) {
-        encoded1 = lookup[base64.charCodeAt(i)];
-        encoded2 = lookup[base64.charCodeAt(i + 1)];
-        encoded3 = lookup[base64.charCodeAt(i + 2)];
-        encoded4 = lookup[base64.charCodeAt(i + 3)];
-        bytes[p++] = (encoded1 << 2) | (encoded2 >> 4);
-        bytes[p++] = ((encoded2 & 15) << 4) | (encoded3 >> 2);
-        bytes[p++] = ((encoded3 & 3) << 6) | (encoded4 & 63);
-    }
-    return arraybuffer;
-};
-exports.decode = decode;
+/**
+ * This is the web browser implementation of `debug()`.
+ */
 
-},{}],24:[function(require,module,exports){
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-const commons_js_1 = require("./commons.js");
-const base64_arraybuffer_js_1 = require("./contrib/base64-arraybuffer.js");
-const withNativeArrayBuffer = typeof ArrayBuffer === "function";
-const decodePacket = (encodedPacket, binaryType) => {
-    if (typeof encodedPacket !== "string") {
-        return {
-            type: "message",
-            data: mapBinary(encodedPacket, binaryType)
-        };
-    }
-    const type = encodedPacket.charAt(0);
-    if (type === "b") {
-        return {
-            type: "message",
-            data: decodeBase64Packet(encodedPacket.substring(1), binaryType)
-        };
-    }
-    const packetType = commons_js_1.PACKET_TYPES_REVERSE[type];
-    if (!packetType) {
-        return commons_js_1.ERROR_PACKET;
-    }
-    return encodedPacket.length > 1
-        ? {
-            type: commons_js_1.PACKET_TYPES_REVERSE[type],
-            data: encodedPacket.substring(1)
-        }
-        : {
-            type: commons_js_1.PACKET_TYPES_REVERSE[type]
-        };
-};
-const decodeBase64Packet = (data, binaryType) => {
-    if (withNativeArrayBuffer) {
-        const decoded = (0, base64_arraybuffer_js_1.decode)(data);
-        return mapBinary(decoded, binaryType);
-    }
-    else {
-        return { base64: true, data }; // fallback for old browsers
-    }
-};
-const mapBinary = (data, binaryType) => {
-    switch (binaryType) {
-        case "blob":
-            return data instanceof ArrayBuffer ? new Blob([data]) : data;
-        case "arraybuffer":
-        default:
-            return data; // assuming the data is already an ArrayBuffer
-    }
-};
-exports.default = decodePacket;
+exports.formatArgs = formatArgs;
+exports.save = save;
+exports.load = load;
+exports.useColors = useColors;
+exports.storage = localstorage();
+exports.destroy = (() => {
+	let warned = false;
 
-},{"./commons.js":22,"./contrib/base64-arraybuffer.js":23}],25:[function(require,module,exports){
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-const commons_js_1 = require("./commons.js");
-const withNativeBlob = typeof Blob === "function" ||
-    (typeof Blob !== "undefined" &&
-        Object.prototype.toString.call(Blob) === "[object BlobConstructor]");
-const withNativeArrayBuffer = typeof ArrayBuffer === "function";
-// ArrayBuffer.isView method is not defined in IE10
-const isView = obj => {
-    return typeof ArrayBuffer.isView === "function"
-        ? ArrayBuffer.isView(obj)
-        : obj && obj.buffer instanceof ArrayBuffer;
-};
-const encodePacket = ({ type, data }, supportsBinary, callback) => {
-    if (withNativeBlob && data instanceof Blob) {
-        if (supportsBinary) {
-            return callback(data);
-        }
-        else {
-            return encodeBlobAsBase64(data, callback);
-        }
-    }
-    else if (withNativeArrayBuffer &&
-        (data instanceof ArrayBuffer || isView(data))) {
-        if (supportsBinary) {
-            return callback(data);
-        }
-        else {
-            return encodeBlobAsBase64(new Blob([data]), callback);
-        }
-    }
-    // plain string
-    return callback(commons_js_1.PACKET_TYPES[type] + (data || ""));
-};
-const encodeBlobAsBase64 = (data, callback) => {
-    const fileReader = new FileReader();
-    fileReader.onload = function () {
-        const content = fileReader.result.split(",")[1];
-        callback("b" + (content || ""));
-    };
-    return fileReader.readAsDataURL(data);
-};
-exports.default = encodePacket;
+	return () => {
+		if (!warned) {
+			warned = true;
+			console.warn('Instance method `debug.destroy()` is deprecated and no longer does anything. It will be removed in the next major version of `debug`.');
+		}
+	};
+})();
 
-},{"./commons.js":22}],26:[function(require,module,exports){
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.decodePayload = exports.decodePacket = exports.encodePayload = exports.encodePacket = exports.protocol = void 0;
-const encodePacket_js_1 = require("./encodePacket.js");
-exports.encodePacket = encodePacket_js_1.default;
-const decodePacket_js_1 = require("./decodePacket.js");
-exports.decodePacket = decodePacket_js_1.default;
-const SEPARATOR = String.fromCharCode(30); // see https://en.wikipedia.org/wiki/Delimiter#ASCII_delimited_text
-const encodePayload = (packets, callback) => {
-    // some packets may be added to the array while encoding, so the initial length must be saved
-    const length = packets.length;
-    const encodedPackets = new Array(length);
-    let count = 0;
-    packets.forEach((packet, i) => {
-        // force base64 encoding for binary packets
-        (0, encodePacket_js_1.default)(packet, false, encodedPacket => {
-            encodedPackets[i] = encodedPacket;
-            if (++count === length) {
-                callback(encodedPackets.join(SEPARATOR));
-            }
-        });
-    });
-};
-exports.encodePayload = encodePayload;
-const decodePayload = (encodedPayload, binaryType) => {
-    const encodedPackets = encodedPayload.split(SEPARATOR);
-    const packets = [];
-    for (let i = 0; i < encodedPackets.length; i++) {
-        const decodedPacket = (0, decodePacket_js_1.default)(encodedPackets[i], binaryType);
-        packets.push(decodedPacket);
-        if (decodedPacket.type === "error") {
-            break;
-        }
-    }
-    return packets;
-};
-exports.decodePayload = decodePayload;
-exports.protocol = 4;
+/**
+ * Colors.
+ */
 
-},{"./decodePacket.js":24,"./encodePacket.js":25}],27:[function(require,module,exports){
-/*! ieee754. BSD-3-Clause License. Feross Aboukhadijeh <https://feross.org/opensource> */
-exports.read = function (buffer, offset, isLE, mLen, nBytes) {
-  var e, m
-  var eLen = (nBytes * 8) - mLen - 1
-  var eMax = (1 << eLen) - 1
-  var eBias = eMax >> 1
-  var nBits = -7
-  var i = isLE ? (nBytes - 1) : 0
-  var d = isLE ? -1 : 1
-  var s = buffer[offset + i]
+exports.colors = [
+	'#0000CC',
+	'#0000FF',
+	'#0033CC',
+	'#0033FF',
+	'#0066CC',
+	'#0066FF',
+	'#0099CC',
+	'#0099FF',
+	'#00CC00',
+	'#00CC33',
+	'#00CC66',
+	'#00CC99',
+	'#00CCCC',
+	'#00CCFF',
+	'#3300CC',
+	'#3300FF',
+	'#3333CC',
+	'#3333FF',
+	'#3366CC',
+	'#3366FF',
+	'#3399CC',
+	'#3399FF',
+	'#33CC00',
+	'#33CC33',
+	'#33CC66',
+	'#33CC99',
+	'#33CCCC',
+	'#33CCFF',
+	'#6600CC',
+	'#6600FF',
+	'#6633CC',
+	'#6633FF',
+	'#66CC00',
+	'#66CC33',
+	'#9900CC',
+	'#9900FF',
+	'#9933CC',
+	'#9933FF',
+	'#99CC00',
+	'#99CC33',
+	'#CC0000',
+	'#CC0033',
+	'#CC0066',
+	'#CC0099',
+	'#CC00CC',
+	'#CC00FF',
+	'#CC3300',
+	'#CC3333',
+	'#CC3366',
+	'#CC3399',
+	'#CC33CC',
+	'#CC33FF',
+	'#CC6600',
+	'#CC6633',
+	'#CC9900',
+	'#CC9933',
+	'#CCCC00',
+	'#CCCC33',
+	'#FF0000',
+	'#FF0033',
+	'#FF0066',
+	'#FF0099',
+	'#FF00CC',
+	'#FF00FF',
+	'#FF3300',
+	'#FF3333',
+	'#FF3366',
+	'#FF3399',
+	'#FF33CC',
+	'#FF33FF',
+	'#FF6600',
+	'#FF6633',
+	'#FF9900',
+	'#FF9933',
+	'#FFCC00',
+	'#FFCC33'
+];
 
-  i += d
+/**
+ * Currently only WebKit-based Web Inspectors, Firefox >= v31,
+ * and the Firebug extension (any Firefox version) are known
+ * to support "%c" CSS customizations.
+ *
+ * TODO: add a `localStorage` variable to explicitly enable/disable colors
+ */
 
-  e = s & ((1 << (-nBits)) - 1)
-  s >>= (-nBits)
-  nBits += eLen
-  for (; nBits > 0; e = (e * 256) + buffer[offset + i], i += d, nBits -= 8) {}
+// eslint-disable-next-line complexity
+function useColors() {
+	// NB: In an Electron preload script, document will be defined but not fully
+	// initialized. Since we know we're in Chrome, we'll just detect this case
+	// explicitly
+	if (typeof window !== 'undefined' && window.process && (window.process.type === 'renderer' || window.process.__nwjs)) {
+		return true;
+	}
 
-  m = e & ((1 << (-nBits)) - 1)
-  e >>= (-nBits)
-  nBits += mLen
-  for (; nBits > 0; m = (m * 256) + buffer[offset + i], i += d, nBits -= 8) {}
+	// Internet Explorer and Edge do not support colors.
+	if (typeof navigator !== 'undefined' && navigator.userAgent && navigator.userAgent.toLowerCase().match(/(edge|trident)\/(\d+)/)) {
+		return false;
+	}
 
-  if (e === 0) {
-    e = 1 - eBias
-  } else if (e === eMax) {
-    return m ? NaN : ((s ? -1 : 1) * Infinity)
-  } else {
-    m = m + Math.pow(2, mLen)
-    e = e - eBias
-  }
-  return (s ? -1 : 1) * m * Math.pow(2, e - mLen)
+	// Is webkit? http://stackoverflow.com/a/16459606/376773
+	// document is undefined in react-native: https://github.com/facebook/react-native/pull/1632
+	return (typeof document !== 'undefined' && document.documentElement && document.documentElement.style && document.documentElement.style.WebkitAppearance) ||
+		// Is firebug? http://stackoverflow.com/a/398120/376773
+		(typeof window !== 'undefined' && window.console && (window.console.firebug || (window.console.exception && window.console.table))) ||
+		// Is firefox >= v31?
+		// https://developer.mozilla.org/en-US/docs/Tools/Web_Console#Styling_messages
+		(typeof navigator !== 'undefined' && navigator.userAgent && navigator.userAgent.toLowerCase().match(/firefox\/(\d+)/) && parseInt(RegExp.$1, 10) >= 31) ||
+		// Double check webkit in userAgent just in case we are in a worker
+		(typeof navigator !== 'undefined' && navigator.userAgent && navigator.userAgent.toLowerCase().match(/applewebkit\/(\d+)/));
 }
 
-exports.write = function (buffer, value, offset, isLE, mLen, nBytes) {
-  var e, m, c
-  var eLen = (nBytes * 8) - mLen - 1
-  var eMax = (1 << eLen) - 1
-  var eBias = eMax >> 1
-  var rt = (mLen === 23 ? Math.pow(2, -24) - Math.pow(2, -77) : 0)
-  var i = isLE ? 0 : (nBytes - 1)
-  var d = isLE ? 1 : -1
-  var s = value < 0 || (value === 0 && 1 / value < 0) ? 1 : 0
+/**
+ * Colorize log arguments if enabled.
+ *
+ * @api public
+ */
 
-  value = Math.abs(value)
+function formatArgs(args) {
+	args[0] = (this.useColors ? '%c' : '') +
+		this.namespace +
+		(this.useColors ? ' %c' : ' ') +
+		args[0] +
+		(this.useColors ? '%c ' : ' ') +
+		'+' + module.exports.humanize(this.diff);
 
-  if (isNaN(value) || value === Infinity) {
-    m = isNaN(value) ? 1 : 0
-    e = eMax
-  } else {
-    e = Math.floor(Math.log(value) / Math.LN2)
-    if (value * (c = Math.pow(2, -e)) < 1) {
-      e--
-      c *= 2
-    }
-    if (e + eBias >= 1) {
-      value += rt / c
-    } else {
-      value += rt * Math.pow(2, 1 - eBias)
-    }
-    if (value * c >= 2) {
-      e++
-      c /= 2
-    }
+	if (!this.useColors) {
+		return;
+	}
 
-    if (e + eBias >= eMax) {
-      m = 0
-      e = eMax
-    } else if (e + eBias >= 1) {
-      m = ((value * c) - 1) * Math.pow(2, mLen)
-      e = e + eBias
-    } else {
-      m = value * Math.pow(2, eBias - 1) * Math.pow(2, mLen)
-      e = 0
-    }
-  }
+	const c = 'color: ' + this.color;
+	args.splice(1, 0, c, 'color: inherit');
 
-  for (; mLen >= 8; buffer[offset + i] = m & 0xff, i += d, m /= 256, mLen -= 8) {}
+	// The final "%c" is somewhat tricky, because there could be other
+	// arguments passed either before or after the %c, so we need to
+	// figure out the correct index to insert the CSS into
+	let index = 0;
+	let lastC = 0;
+	args[0].replace(/%[a-zA-Z%]/g, match => {
+		if (match === '%%') {
+			return;
+		}
+		index++;
+		if (match === '%c') {
+			// We only are interested in the *last* %c
+			// (the user may have provided their own)
+			lastC = index;
+		}
+	});
 
-  e = (e << mLen) | m
-  eLen += mLen
-  for (; eLen > 0; buffer[offset + i] = e & 0xff, i += d, e /= 256, eLen -= 8) {}
-
-  buffer[offset + i - d] |= s * 128
+	args.splice(lastC, 0, c);
 }
 
-},{}],28:[function(require,module,exports){
+/**
+ * Invokes `console.debug()` when available.
+ * No-op when `console.debug` is not a "function".
+ * If `console.debug` is not available, falls back
+ * to `console.log`.
+ *
+ * @api public
+ */
+exports.log = console.debug || console.log || (() => {});
+
+/**
+ * Save `namespaces`.
+ *
+ * @param {String} namespaces
+ * @api private
+ */
+function save(namespaces) {
+	try {
+		if (namespaces) {
+			exports.storage.setItem('debug', namespaces);
+		} else {
+			exports.storage.removeItem('debug');
+		}
+	} catch (error) {
+		// Swallow
+		// XXX (@Qix-) should we be logging these?
+	}
+}
+
+/**
+ * Load `namespaces`.
+ *
+ * @return {String} returns the previously persisted debug modes
+ * @api private
+ */
+function load() {
+	let r;
+	try {
+		r = exports.storage.getItem('debug');
+	} catch (error) {
+		// Swallow
+		// XXX (@Qix-) should we be logging these?
+	}
+
+	// If debug isn't set in LS, and we're in Electron, try to load $DEBUG
+	if (!r && typeof process !== 'undefined' && 'env' in process) {
+		r = process.env.DEBUG;
+	}
+
+	return r;
+}
+
+/**
+ * Localstorage attempts to return the localstorage.
+ *
+ * This is necessary because safari throws
+ * when a user disables cookies/localstorage
+ * and you attempt to access it.
+ *
+ * @return {LocalStorage}
+ * @api private
+ */
+
+function localstorage() {
+	try {
+		// TVMLKit (Apple TV JS Runtime) does not have a window object, just localStorage in the global context
+		// The Browser also has localStorage in the global context.
+		return localStorage;
+	} catch (error) {
+		// Swallow
+		// XXX (@Qix-) should we be logging these?
+	}
+}
+
+module.exports = require('./common')(exports);
+
+const {formatters} = module.exports;
+
+/**
+ * Map %j to `JSON.stringify()`, since no Web Inspectors do that by default.
+ */
+
+formatters.j = function (v) {
+	try {
+		return JSON.stringify(v);
+	} catch (error) {
+		return '[UnexpectedJSONParseError]: ' + error.message;
+	}
+};
+
+}).call(this)}).call(this,require('_process'))
+},{"./common":21,"_process":30}],21:[function(require,module,exports){
+
+/**
+ * This is the common logic for both the Node.js and web browser
+ * implementations of `debug()`.
+ */
+
+function setup(env) {
+	createDebug.debug = createDebug;
+	createDebug.default = createDebug;
+	createDebug.coerce = coerce;
+	createDebug.disable = disable;
+	createDebug.enable = enable;
+	createDebug.enabled = enabled;
+	createDebug.humanize = require('ms');
+	createDebug.destroy = destroy;
+
+	Object.keys(env).forEach(key => {
+		createDebug[key] = env[key];
+	});
+
+	/**
+	* The currently active debug mode names, and names to skip.
+	*/
+
+	createDebug.names = [];
+	createDebug.skips = [];
+
+	/**
+	* Map of special "%n" handling functions, for the debug "format" argument.
+	*
+	* Valid key names are a single, lower or upper-case letter, i.e. "n" and "N".
+	*/
+	createDebug.formatters = {};
+
+	/**
+	* Selects a color for a debug namespace
+	* @param {String} namespace The namespace string for the debug instance to be colored
+	* @return {Number|String} An ANSI color code for the given namespace
+	* @api private
+	*/
+	function selectColor(namespace) {
+		let hash = 0;
+
+		for (let i = 0; i < namespace.length; i++) {
+			hash = ((hash << 5) - hash) + namespace.charCodeAt(i);
+			hash |= 0; // Convert to 32bit integer
+		}
+
+		return createDebug.colors[Math.abs(hash) % createDebug.colors.length];
+	}
+	createDebug.selectColor = selectColor;
+
+	/**
+	* Create a debugger with the given `namespace`.
+	*
+	* @param {String} namespace
+	* @return {Function}
+	* @api public
+	*/
+	function createDebug(namespace) {
+		let prevTime;
+		let enableOverride = null;
+		let namespacesCache;
+		let enabledCache;
+
+		function debug(...args) {
+			// Disabled?
+			if (!debug.enabled) {
+				return;
+			}
+
+			const self = debug;
+
+			// Set `diff` timestamp
+			const curr = Number(new Date());
+			const ms = curr - (prevTime || curr);
+			self.diff = ms;
+			self.prev = prevTime;
+			self.curr = curr;
+			prevTime = curr;
+
+			args[0] = createDebug.coerce(args[0]);
+
+			if (typeof args[0] !== 'string') {
+				// Anything else let's inspect with %O
+				args.unshift('%O');
+			}
+
+			// Apply any `formatters` transformations
+			let index = 0;
+			args[0] = args[0].replace(/%([a-zA-Z%])/g, (match, format) => {
+				// If we encounter an escaped % then don't increase the array index
+				if (match === '%%') {
+					return '%';
+				}
+				index++;
+				const formatter = createDebug.formatters[format];
+				if (typeof formatter === 'function') {
+					const val = args[index];
+					match = formatter.call(self, val);
+
+					// Now we need to remove `args[index]` since it's inlined in the `format`
+					args.splice(index, 1);
+					index--;
+				}
+				return match;
+			});
+
+			// Apply env-specific formatting (colors, etc.)
+			createDebug.formatArgs.call(self, args);
+
+			const logFn = self.log || createDebug.log;
+			logFn.apply(self, args);
+		}
+
+		debug.namespace = namespace;
+		debug.useColors = createDebug.useColors();
+		debug.color = createDebug.selectColor(namespace);
+		debug.extend = extend;
+		debug.destroy = createDebug.destroy; // XXX Temporary. Will be removed in the next major release.
+
+		Object.defineProperty(debug, 'enabled', {
+			enumerable: true,
+			configurable: false,
+			get: () => {
+				if (enableOverride !== null) {
+					return enableOverride;
+				}
+				if (namespacesCache !== createDebug.namespaces) {
+					namespacesCache = createDebug.namespaces;
+					enabledCache = createDebug.enabled(namespace);
+				}
+
+				return enabledCache;
+			},
+			set: v => {
+				enableOverride = v;
+			}
+		});
+
+		// Env-specific initialization logic for debug instances
+		if (typeof createDebug.init === 'function') {
+			createDebug.init(debug);
+		}
+
+		return debug;
+	}
+
+	function extend(namespace, delimiter) {
+		const newDebug = createDebug(this.namespace + (typeof delimiter === 'undefined' ? ':' : delimiter) + namespace);
+		newDebug.log = this.log;
+		return newDebug;
+	}
+
+	/**
+	* Enables a debug mode by namespaces. This can include modes
+	* separated by a colon and wildcards.
+	*
+	* @param {String} namespaces
+	* @api public
+	*/
+	function enable(namespaces) {
+		createDebug.save(namespaces);
+		createDebug.namespaces = namespaces;
+
+		createDebug.names = [];
+		createDebug.skips = [];
+
+		let i;
+		const split = (typeof namespaces === 'string' ? namespaces : '').split(/[\s,]+/);
+		const len = split.length;
+
+		for (i = 0; i < len; i++) {
+			if (!split[i]) {
+				// ignore empty strings
+				continue;
+			}
+
+			namespaces = split[i].replace(/\*/g, '.*?');
+
+			if (namespaces[0] === '-') {
+				createDebug.skips.push(new RegExp('^' + namespaces.slice(1) + '$'));
+			} else {
+				createDebug.names.push(new RegExp('^' + namespaces + '$'));
+			}
+		}
+	}
+
+	/**
+	* Disable debug output.
+	*
+	* @return {String} namespaces
+	* @api public
+	*/
+	function disable() {
+		const namespaces = [
+			...createDebug.names.map(toNamespace),
+			...createDebug.skips.map(toNamespace).map(namespace => '-' + namespace)
+		].join(',');
+		createDebug.enable('');
+		return namespaces;
+	}
+
+	/**
+	* Returns true if the given mode name is enabled, false otherwise.
+	*
+	* @param {String} name
+	* @return {Boolean}
+	* @api public
+	*/
+	function enabled(name) {
+		if (name[name.length - 1] === '*') {
+			return true;
+		}
+
+		let i;
+		let len;
+
+		for (i = 0, len = createDebug.skips.length; i < len; i++) {
+			if (createDebug.skips[i].test(name)) {
+				return false;
+			}
+		}
+
+		for (i = 0, len = createDebug.names.length; i < len; i++) {
+			if (createDebug.names[i].test(name)) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	* Convert regexp to namespace
+	*
+	* @param {RegExp} regxep
+	* @return {String} namespace
+	* @api private
+	*/
+	function toNamespace(regexp) {
+		return regexp.toString()
+			.substring(2, regexp.toString().length - 2)
+			.replace(/\.\*\?$/, '*');
+	}
+
+	/**
+	* Coerce `val`.
+	*
+	* @param {Mixed} val
+	* @return {Mixed}
+	* @api private
+	*/
+	function coerce(val) {
+		if (val instanceof Error) {
+			return val.stack || val.message;
+		}
+		return val;
+	}
+
+	/**
+	* XXX DO NOT USE. This is a temporary stub function.
+	* XXX It WILL be removed in the next major release.
+	*/
+	function destroy() {
+		console.warn('Instance method `debug.destroy()` is deprecated and no longer does anything. It will be removed in the next major version of `debug`.');
+	}
+
+	createDebug.enable(createDebug.load());
+
+	return createDebug;
+}
+
+module.exports = setup;
+
+},{"ms":22}],22:[function(require,module,exports){
 /**
  * Helpers.
  */
@@ -5931,6 +5837,301 @@ function fmtLong(ms) {
 function plural(ms, msAbs, n, name) {
   var isPlural = msAbs >= n * 1.5;
   return Math.round(ms / n) + ' ' + name + (isPlural ? 's' : '');
+}
+
+},{}],23:[function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.ERROR_PACKET = exports.PACKET_TYPES_REVERSE = exports.PACKET_TYPES = void 0;
+const PACKET_TYPES = Object.create(null); // no Map = no polyfill
+exports.PACKET_TYPES = PACKET_TYPES;
+PACKET_TYPES["open"] = "0";
+PACKET_TYPES["close"] = "1";
+PACKET_TYPES["ping"] = "2";
+PACKET_TYPES["pong"] = "3";
+PACKET_TYPES["message"] = "4";
+PACKET_TYPES["upgrade"] = "5";
+PACKET_TYPES["noop"] = "6";
+const PACKET_TYPES_REVERSE = Object.create(null);
+exports.PACKET_TYPES_REVERSE = PACKET_TYPES_REVERSE;
+Object.keys(PACKET_TYPES).forEach(key => {
+    PACKET_TYPES_REVERSE[PACKET_TYPES[key]] = key;
+});
+const ERROR_PACKET = { type: "error", data: "parser error" };
+exports.ERROR_PACKET = ERROR_PACKET;
+
+},{}],24:[function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.decode = exports.encode = void 0;
+const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+// Use a lookup table to find the index.
+const lookup = typeof Uint8Array === 'undefined' ? [] : new Uint8Array(256);
+for (let i = 0; i < chars.length; i++) {
+    lookup[chars.charCodeAt(i)] = i;
+}
+const encode = (arraybuffer) => {
+    let bytes = new Uint8Array(arraybuffer), i, len = bytes.length, base64 = '';
+    for (i = 0; i < len; i += 3) {
+        base64 += chars[bytes[i] >> 2];
+        base64 += chars[((bytes[i] & 3) << 4) | (bytes[i + 1] >> 4)];
+        base64 += chars[((bytes[i + 1] & 15) << 2) | (bytes[i + 2] >> 6)];
+        base64 += chars[bytes[i + 2] & 63];
+    }
+    if (len % 3 === 2) {
+        base64 = base64.substring(0, base64.length - 1) + '=';
+    }
+    else if (len % 3 === 1) {
+        base64 = base64.substring(0, base64.length - 2) + '==';
+    }
+    return base64;
+};
+exports.encode = encode;
+const decode = (base64) => {
+    let bufferLength = base64.length * 0.75, len = base64.length, i, p = 0, encoded1, encoded2, encoded3, encoded4;
+    if (base64[base64.length - 1] === '=') {
+        bufferLength--;
+        if (base64[base64.length - 2] === '=') {
+            bufferLength--;
+        }
+    }
+    const arraybuffer = new ArrayBuffer(bufferLength), bytes = new Uint8Array(arraybuffer);
+    for (i = 0; i < len; i += 4) {
+        encoded1 = lookup[base64.charCodeAt(i)];
+        encoded2 = lookup[base64.charCodeAt(i + 1)];
+        encoded3 = lookup[base64.charCodeAt(i + 2)];
+        encoded4 = lookup[base64.charCodeAt(i + 3)];
+        bytes[p++] = (encoded1 << 2) | (encoded2 >> 4);
+        bytes[p++] = ((encoded2 & 15) << 4) | (encoded3 >> 2);
+        bytes[p++] = ((encoded3 & 3) << 6) | (encoded4 & 63);
+    }
+    return arraybuffer;
+};
+exports.decode = decode;
+
+},{}],25:[function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const commons_js_1 = require("./commons.js");
+const base64_arraybuffer_js_1 = require("./contrib/base64-arraybuffer.js");
+const withNativeArrayBuffer = typeof ArrayBuffer === "function";
+const decodePacket = (encodedPacket, binaryType) => {
+    if (typeof encodedPacket !== "string") {
+        return {
+            type: "message",
+            data: mapBinary(encodedPacket, binaryType)
+        };
+    }
+    const type = encodedPacket.charAt(0);
+    if (type === "b") {
+        return {
+            type: "message",
+            data: decodeBase64Packet(encodedPacket.substring(1), binaryType)
+        };
+    }
+    const packetType = commons_js_1.PACKET_TYPES_REVERSE[type];
+    if (!packetType) {
+        return commons_js_1.ERROR_PACKET;
+    }
+    return encodedPacket.length > 1
+        ? {
+            type: commons_js_1.PACKET_TYPES_REVERSE[type],
+            data: encodedPacket.substring(1)
+        }
+        : {
+            type: commons_js_1.PACKET_TYPES_REVERSE[type]
+        };
+};
+const decodeBase64Packet = (data, binaryType) => {
+    if (withNativeArrayBuffer) {
+        const decoded = (0, base64_arraybuffer_js_1.decode)(data);
+        return mapBinary(decoded, binaryType);
+    }
+    else {
+        return { base64: true, data }; // fallback for old browsers
+    }
+};
+const mapBinary = (data, binaryType) => {
+    switch (binaryType) {
+        case "blob":
+            return data instanceof ArrayBuffer ? new Blob([data]) : data;
+        case "arraybuffer":
+        default:
+            return data; // assuming the data is already an ArrayBuffer
+    }
+};
+exports.default = decodePacket;
+
+},{"./commons.js":23,"./contrib/base64-arraybuffer.js":24}],26:[function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const commons_js_1 = require("./commons.js");
+const withNativeBlob = typeof Blob === "function" ||
+    (typeof Blob !== "undefined" &&
+        Object.prototype.toString.call(Blob) === "[object BlobConstructor]");
+const withNativeArrayBuffer = typeof ArrayBuffer === "function";
+// ArrayBuffer.isView method is not defined in IE10
+const isView = obj => {
+    return typeof ArrayBuffer.isView === "function"
+        ? ArrayBuffer.isView(obj)
+        : obj && obj.buffer instanceof ArrayBuffer;
+};
+const encodePacket = ({ type, data }, supportsBinary, callback) => {
+    if (withNativeBlob && data instanceof Blob) {
+        if (supportsBinary) {
+            return callback(data);
+        }
+        else {
+            return encodeBlobAsBase64(data, callback);
+        }
+    }
+    else if (withNativeArrayBuffer &&
+        (data instanceof ArrayBuffer || isView(data))) {
+        if (supportsBinary) {
+            return callback(data);
+        }
+        else {
+            return encodeBlobAsBase64(new Blob([data]), callback);
+        }
+    }
+    // plain string
+    return callback(commons_js_1.PACKET_TYPES[type] + (data || ""));
+};
+const encodeBlobAsBase64 = (data, callback) => {
+    const fileReader = new FileReader();
+    fileReader.onload = function () {
+        const content = fileReader.result.split(",")[1];
+        callback("b" + content);
+    };
+    return fileReader.readAsDataURL(data);
+};
+exports.default = encodePacket;
+
+},{"./commons.js":23}],27:[function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.decodePayload = exports.decodePacket = exports.encodePayload = exports.encodePacket = exports.protocol = void 0;
+const encodePacket_js_1 = require("./encodePacket.js");
+exports.encodePacket = encodePacket_js_1.default;
+const decodePacket_js_1 = require("./decodePacket.js");
+exports.decodePacket = decodePacket_js_1.default;
+const SEPARATOR = String.fromCharCode(30); // see https://en.wikipedia.org/wiki/Delimiter#ASCII_delimited_text
+const encodePayload = (packets, callback) => {
+    // some packets may be added to the array while encoding, so the initial length must be saved
+    const length = packets.length;
+    const encodedPackets = new Array(length);
+    let count = 0;
+    packets.forEach((packet, i) => {
+        // force base64 encoding for binary packets
+        (0, encodePacket_js_1.default)(packet, false, encodedPacket => {
+            encodedPackets[i] = encodedPacket;
+            if (++count === length) {
+                callback(encodedPackets.join(SEPARATOR));
+            }
+        });
+    });
+};
+exports.encodePayload = encodePayload;
+const decodePayload = (encodedPayload, binaryType) => {
+    const encodedPackets = encodedPayload.split(SEPARATOR);
+    const packets = [];
+    for (let i = 0; i < encodedPackets.length; i++) {
+        const decodedPacket = (0, decodePacket_js_1.default)(encodedPackets[i], binaryType);
+        packets.push(decodedPacket);
+        if (decodedPacket.type === "error") {
+            break;
+        }
+    }
+    return packets;
+};
+exports.decodePayload = decodePayload;
+exports.protocol = 4;
+
+},{"./decodePacket.js":25,"./encodePacket.js":26}],28:[function(require,module,exports){
+/*! ieee754. BSD-3-Clause License. Feross Aboukhadijeh <https://feross.org/opensource> */
+exports.read = function (buffer, offset, isLE, mLen, nBytes) {
+  var e, m
+  var eLen = (nBytes * 8) - mLen - 1
+  var eMax = (1 << eLen) - 1
+  var eBias = eMax >> 1
+  var nBits = -7
+  var i = isLE ? (nBytes - 1) : 0
+  var d = isLE ? -1 : 1
+  var s = buffer[offset + i]
+
+  i += d
+
+  e = s & ((1 << (-nBits)) - 1)
+  s >>= (-nBits)
+  nBits += eLen
+  for (; nBits > 0; e = (e * 256) + buffer[offset + i], i += d, nBits -= 8) {}
+
+  m = e & ((1 << (-nBits)) - 1)
+  e >>= (-nBits)
+  nBits += mLen
+  for (; nBits > 0; m = (m * 256) + buffer[offset + i], i += d, nBits -= 8) {}
+
+  if (e === 0) {
+    e = 1 - eBias
+  } else if (e === eMax) {
+    return m ? NaN : ((s ? -1 : 1) * Infinity)
+  } else {
+    m = m + Math.pow(2, mLen)
+    e = e - eBias
+  }
+  return (s ? -1 : 1) * m * Math.pow(2, e - mLen)
+}
+
+exports.write = function (buffer, value, offset, isLE, mLen, nBytes) {
+  var e, m, c
+  var eLen = (nBytes * 8) - mLen - 1
+  var eMax = (1 << eLen) - 1
+  var eBias = eMax >> 1
+  var rt = (mLen === 23 ? Math.pow(2, -24) - Math.pow(2, -77) : 0)
+  var i = isLE ? 0 : (nBytes - 1)
+  var d = isLE ? 1 : -1
+  var s = value < 0 || (value === 0 && 1 / value < 0) ? 1 : 0
+
+  value = Math.abs(value)
+
+  if (isNaN(value) || value === Infinity) {
+    m = isNaN(value) ? 1 : 0
+    e = eMax
+  } else {
+    e = Math.floor(Math.log(value) / Math.LN2)
+    if (value * (c = Math.pow(2, -e)) < 1) {
+      e--
+      c *= 2
+    }
+    if (e + eBias >= 1) {
+      value += rt / c
+    } else {
+      value += rt * Math.pow(2, 1 - eBias)
+    }
+    if (value * c >= 2) {
+      e++
+      c /= 2
+    }
+
+    if (e + eBias >= eMax) {
+      m = 0
+      e = eMax
+    } else if (e + eBias >= 1) {
+      m = ((value * c) - 1) * Math.pow(2, mLen)
+      e = e + eBias
+    } else {
+      m = value * Math.pow(2, eBias - 1) * Math.pow(2, mLen)
+      e = 0
+    }
+  }
+
+  for (; mLen >= 8; buffer[offset + i] = m & 0xff, i += d, m /= 256, mLen -= 8) {}
+
+  e = (e << mLen) | m
+  eLen += mLen
+  for (; eLen > 0; buffer[offset + i] = e & 0xff, i += d, e /= 256, eLen -= 8) {}
+
+  buffer[offset + i - d] |= s * 128
 }
 
 },{}],29:[function(require,module,exports){
@@ -6354,7 +6555,7 @@ Object.defineProperty(exports, "protocol", { enumerable: true, get: function () 
 
 module.exports = lookup;
 
-},{"./manager.js":33,"./socket.js":35,"./url.js":36,"debug":6,"socket.io-parser":38}],33:[function(require,module,exports){
+},{"./manager.js":33,"./socket.js":35,"./url.js":36,"debug":37,"socket.io-parser":41}],33:[function(require,module,exports){
 "use strict";
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
@@ -6759,7 +6960,7 @@ class Manager extends component_emitter_1.Emitter {
 }
 exports.Manager = Manager;
 
-},{"./contrib/backo2.js":31,"./on.js":34,"./socket.js":35,"@socket.io/component-emitter":2,"debug":6,"engine.io-client":13,"socket.io-parser":38}],34:[function(require,module,exports){
+},{"./contrib/backo2.js":31,"./on.js":34,"./socket.js":35,"@socket.io/component-emitter":2,"debug":37,"engine.io-client":11,"socket.io-parser":41}],34:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.on = void 0;
@@ -7499,7 +7700,7 @@ class Socket extends component_emitter_1.Emitter {
 }
 exports.Socket = Socket;
 
-},{"./on.js":34,"@socket.io/component-emitter":2,"debug":6,"socket.io-parser":38}],36:[function(require,module,exports){
+},{"./on.js":34,"@socket.io/component-emitter":2,"debug":37,"socket.io-parser":41}],36:[function(require,module,exports){
 "use strict";
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
@@ -7571,7 +7772,13 @@ function url(uri, path = "", loc) {
 }
 exports.url = url;
 
-},{"debug":6,"engine.io-client":13}],37:[function(require,module,exports){
+},{"debug":37,"engine.io-client":11}],37:[function(require,module,exports){
+arguments[4][20][0].apply(exports,arguments)
+},{"./common":38,"_process":30,"dup":20}],38:[function(require,module,exports){
+arguments[4][21][0].apply(exports,arguments)
+},{"dup":21,"ms":39}],39:[function(require,module,exports){
+arguments[4][22][0].apply(exports,arguments)
+},{"dup":22}],40:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.reconstructPacket = exports.deconstructPacket = void 0;
@@ -7595,7 +7802,7 @@ exports.deconstructPacket = deconstructPacket;
 function _deconstructPacket(data, buffers) {
     if (!data)
         return data;
-    if ((0, is_binary_js_1.isBinary)(data)) {
+    if (is_binary_js_1.isBinary(data)) {
         const placeholder = { _placeholder: true, num: buffers.length };
         buffers.push(data);
         return placeholder;
@@ -7628,7 +7835,7 @@ function _deconstructPacket(data, buffers) {
  */
 function reconstructPacket(packet, buffers) {
     packet.data = _reconstructPacket(packet.data, buffers);
-    delete packet.attachments; // no longer useful
+    packet.attachments = undefined; // no longer useful
     return packet;
 }
 exports.reconstructPacket = reconstructPacket;
@@ -7661,7 +7868,7 @@ function _reconstructPacket(data, buffers) {
     return data;
 }
 
-},{"./is-binary.js":39}],38:[function(require,module,exports){
+},{"./is-binary.js":42}],41:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Decoder = exports.Encoder = exports.PacketType = exports.protocol = void 0;
@@ -7669,7 +7876,7 @@ const component_emitter_1 = require("@socket.io/component-emitter");
 const binary_js_1 = require("./binary.js");
 const is_binary_js_1 = require("./is-binary.js");
 const debug_1 = require("debug"); // debug()
-const debug = (0, debug_1.default)("socket.io-parser"); // debug()
+const debug = debug_1.default("socket.io-parser"); // debug()
 /**
  * Protocol version.
  *
@@ -7707,15 +7914,12 @@ class Encoder {
     encode(obj) {
         debug("encoding packet %j", obj);
         if (obj.type === PacketType.EVENT || obj.type === PacketType.ACK) {
-            if ((0, is_binary_js_1.hasBinary)(obj)) {
-                return this.encodeAsBinary({
-                    type: obj.type === PacketType.EVENT
+            if (is_binary_js_1.hasBinary(obj)) {
+                obj.type =
+                    obj.type === PacketType.EVENT
                         ? PacketType.BINARY_EVENT
-                        : PacketType.BINARY_ACK,
-                    nsp: obj.nsp,
-                    data: obj.data,
-                    id: obj.id,
-                });
+                        : PacketType.BINARY_ACK;
+                return this.encodeAsBinary(obj);
             }
         }
         return [this.encodeAsString(obj)];
@@ -7753,7 +7957,7 @@ class Encoder {
      * a list of buffers.
      */
     encodeAsBinary(obj) {
-        const deconstruction = (0, binary_js_1.deconstructPacket)(obj);
+        const deconstruction = binary_js_1.deconstructPacket(obj);
         const pack = this.encodeAsString(deconstruction.packet);
         const buffers = deconstruction.buffers;
         buffers.unshift(pack); // add packet info to beginning of data list
@@ -7788,9 +7992,8 @@ class Decoder extends component_emitter_1.Emitter {
                 throw new Error("got plaintext data when reconstructing a packet");
             }
             packet = this.decodeString(obj);
-            const isBinaryEvent = packet.type === PacketType.BINARY_EVENT;
-            if (isBinaryEvent || packet.type === PacketType.BINARY_ACK) {
-                packet.type = isBinaryEvent ? PacketType.EVENT : PacketType.ACK;
+            if (packet.type === PacketType.BINARY_EVENT ||
+                packet.type === PacketType.BINARY_ACK) {
                 // binary packet's json
                 this.reconstructor = new BinaryReconstructor(packet);
                 // no attachments, labeled binary but no binary data to follow
@@ -7803,7 +8006,7 @@ class Decoder extends component_emitter_1.Emitter {
                 super.emitReserved("decoded", packet);
             }
         }
-        else if ((0, is_binary_js_1.isBinary)(obj) || obj.base64) {
+        else if (is_binary_js_1.isBinary(obj) || obj.base64) {
             // raw binary data
             if (!this.reconstructor) {
                 throw new Error("got binary data when not reconstructing a packet");
@@ -7920,7 +8123,6 @@ class Decoder extends component_emitter_1.Emitter {
     destroy() {
         if (this.reconstructor) {
             this.reconstructor.finishedReconstruction();
-            this.reconstructor = null;
         }
     }
 }
@@ -7951,7 +8153,7 @@ class BinaryReconstructor {
         this.buffers.push(binData);
         if (this.buffers.length === this.reconPack.attachments) {
             // done with buffer list
-            const packet = (0, binary_js_1.reconstructPacket)(this.reconPack, this.buffers);
+            const packet = binary_js_1.reconstructPacket(this.reconPack, this.buffers);
             this.finishedReconstruction();
             return packet;
         }
@@ -7966,7 +8168,7 @@ class BinaryReconstructor {
     }
 }
 
-},{"./binary.js":37,"./is-binary.js":39,"@socket.io/component-emitter":2,"debug":6}],39:[function(require,module,exports){
+},{"./binary.js":40,"./is-binary.js":42,"@socket.io/component-emitter":2,"debug":43}],42:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.hasBinary = exports.isBinary = void 0;
@@ -8023,7 +8225,13 @@ function hasBinary(obj, toJSON) {
 }
 exports.hasBinary = hasBinary;
 
-},{}],40:[function(require,module,exports){
+},{}],43:[function(require,module,exports){
+arguments[4][20][0].apply(exports,arguments)
+},{"./common":44,"_process":30,"dup":20}],44:[function(require,module,exports){
+arguments[4][21][0].apply(exports,arguments)
+},{"dup":21,"ms":45}],45:[function(require,module,exports){
+arguments[4][22][0].apply(exports,arguments)
+},{"dup":22}],46:[function(require,module,exports){
 /*!
  * vary
  * Copyright(c) 2014-2017 Douglas Christopher Wilson
