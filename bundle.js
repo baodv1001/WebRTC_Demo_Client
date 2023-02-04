@@ -216,8 +216,8 @@ socket.on("created", function (room) {
           const mics = devices.filter((device) => device.kind == "audioinput");
 
           const constraints = {
-            video: cams.length > 0,
-            audio: mics.length > 0,
+            video: cams.length > 0 && isCameraAccess,
+            audio: mics.length > 0 && isMicAccess,
           };
           navigator.getUserMedia(
             constraints,
@@ -267,8 +267,8 @@ socket.on("joined", function (numClient) {
           const mics = devices.filter((device) => device.kind == "audioinput");
 
           const constraints = {
-            video: cams.length > 0,
-            audio: mics.length > 0,
+            video: cams.length > 0 && isCameraAccess,
+            audio: mics.length > 0 && isMicAccess,
           };
           navigator.getUserMedia(
             constraints,
