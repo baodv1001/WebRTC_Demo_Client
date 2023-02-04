@@ -210,11 +210,21 @@ socket.on("created", function (room) {
       if (isCameraAccess == false && isMicAccess == false) {
         alert("Please allow camera and microphone access to use this app");
       } else {
-        navigator.getUserMedia(
-          constraints,
-          handleUserMedia,
-          handleUserMediaError
-        );
+        navigator.mediaDevices.enumerateDevices().then((devices) => {
+          const cams = devices.filter((device) => device.kind == "videoinput");
+          const mics = devices.filter((device) => device.kind == "audioinput");
+
+          const constraints = {
+            video: cams.length > 0,
+            audio: mics.length > 0,
+          };
+          navigator.getUserMedia(
+            constraints,
+            handleUserMedia,
+            handleUserMediaError
+          );
+          console.log("Getting user media with constraints", constraints);
+        });
       }
       console.log("Getting user media with constraints", constraints);
     });
@@ -251,11 +261,21 @@ socket.on("joined", function (numClient) {
       if (isCameraAccess == false && isMicAccess == false) {
         alert("Please allow camera and microphone access to use this app");
       } else {
-        navigator.getUserMedia(
-          constraints,
-          handleUserMedia,
-          handleUserMediaError
-        );
+        navigator.mediaDevices.enumerateDevices().then((devices) => {
+          const cams = devices.filter((device) => device.kind == "videoinput");
+          const mics = devices.filter((device) => device.kind == "audioinput");
+
+          const constraints = {
+            video: cams.length > 0,
+            audio: mics.length > 0,
+          };
+          navigator.getUserMedia(
+            constraints,
+            handleUserMedia,
+            handleUserMediaError
+          );
+          console.log("Getting user media with constraints", constraints);
+        });
       }
       console.log("Getting user media with constraints", constraints);
     });
