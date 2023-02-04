@@ -477,6 +477,8 @@ function replaceURLs(message) {
 }
 // Data channel management
 function sendData() {
+  if (!sendTextarea.value) return;
+
   var data = { message: sendTextarea.value, name: yourNameTxt.value };
   // var data = sendTextarea.value;
   // if (isInitiator) sendChannel.send(data);
@@ -526,30 +528,30 @@ function handleMessage(event) {
   receiveTextarea.appendChild(newMessage);
 }
 function handleSendChannelStateChange(sendDataChannel) {
-  var readyState = sendDataChannel.readyState;
-  console.log("Send channel state is: " + readyState);
-  // If channel ready, enable user's input
-  if (readyState == "open") {
-    dataChannelSend.disabled = false;
-    dataChannelSend.focus();
-    sendButton.disabled = false;
-  } else {
-    dataChannelSend.disabled = true;
-    sendButton.disabled = true;
-  }
+  // var readyState = sendDataChannel.readyState;
+  // console.log("Send channel state is: " + readyState);
+  // // If channel ready, enable user's input
+  // if (readyState == "open") {
+  //   dataChannelSend.disabled = false;
+  //   dataChannelSend.focus();
+  //   sendButton.disabled = false;
+  // } else {
+  //   dataChannelSend.disabled = true;
+  //   sendButton.disabled = true;
+  // }
 }
 function handleReceiveChannelStateChange(receiveChannel) {
-  var readyState = receiveChannel.readyState;
-  console.log("Receive channel state is: " + readyState);
-  // If channel ready, enable user's input
-  if (readyState == "open") {
-    dataChannelSend.disabled = false;
-    dataChannelSend.focus();
-    sendButton.disabled = false;
-  } else {
-    dataChannelSend.disabled = true;
-    sendButton.disabled = true;
-  }
+  // var readyState = receiveChannel.readyState;
+  // console.log("Receive channel state is: " + readyState);
+  // // If channel ready, enable user's input
+  // if (readyState == "open") {
+  //   dataChannelSend.disabled = false;
+  //   dataChannelSend.focus();
+  //   sendButton.disabled = false;
+  // } else {
+  //   dataChannelSend.disabled = true;
+  //   sendButton.disabled = true;
+  // }
 }
 // ICE candidates management
 function handleIceCandidate(event) {
