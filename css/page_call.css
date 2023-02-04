@@ -77,8 +77,8 @@ body {
 }
 
 .two {
-  width: 100% !important;
-  position: relative;
+    width: 100% !important;
+    position: relative;
 }
 
 .four {
@@ -87,7 +87,8 @@ body {
 }
 
 .nine {
-  width: 32%;
+    width: 32%;
+    position: relative;
 }
 
 .full {
